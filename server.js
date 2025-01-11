@@ -28,7 +28,8 @@ app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
 app.use('/api', fcmRoutes);
-app.set('trust proxy', true);
+app.set('trust proxy', 'loopback, 127.0.0.1, ::1, <Render_IP>');
+
 
 
 // Rate limiting

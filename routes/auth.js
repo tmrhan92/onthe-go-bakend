@@ -60,7 +60,7 @@ router.post('/login', async (req, res) => {
         // مقارنة كلمة المرور المدخلة مع الكلمة المشفرة في قاعدة البيانات
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+            return res.status(401).send("مرحبا");
         }
 
         // إنشاء توكن JWT

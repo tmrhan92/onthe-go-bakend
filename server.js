@@ -28,6 +28,8 @@ app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
 app.use('/api', fcmRoutes);
+app.set('trust proxy', true);
+
 
 // Rate limiting
 const apiLimiter = rateLimit({

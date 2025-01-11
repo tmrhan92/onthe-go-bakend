@@ -28,15 +28,19 @@ app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
 app.use('/api', fcmRoutes);
-app.set('trust proxy', 'loopback, 127.0.0.1, ::1, <Render_IP>');
 
-
+// تمكين trust proxy بشكل انتقائي (إذا لزم الأمر)
+app.set('trust proxy', 'loopback, 127.0.0.1, ::1');
 
 // Rate limiting
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // Max 100 requests per IP
     message: 'Too many requests, please try again later.',
+    keyGenerator: (req) => {
+        // استخدم رأس X-Forwarded-For إذا كان موجودًا
+        return req.headers['x-forwarded-for'] || req.ip;
+    },
 });
 app.use('/api/', apiLimiter);
 

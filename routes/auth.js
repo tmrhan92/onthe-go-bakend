@@ -11,38 +11,37 @@ return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
 
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
-const { email, password, name, role } = req.body;
+    const { email, password, name, role } = req.body;
 
-if (!email || !password || !name || !role) {
-return res.status(400).send("جميع الحقول مطلوبة.");
-}
+    if (!email || !password || !name || !role) {
+        return res.status(400).send("جميع الحقول مطلوبة.");
+    }
 
-if (!['طالب_خدمة', 'مقدم_خدمة'].includes(role)) {
-return res.status(400).send("الدور غير صالح.");
-}
+    if (!['طالب_خدمة', 'مقدم_خدمة'].includes(role)) {
+        return res.status(400).send("الدور غير صالح.");
+    }
 
-const existingUser = await User.findOne({ email });
-if (existingUser) {
-return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
-}
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+        return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
+    }
 
-const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-// توليد userId كـ String
-const userId = generateUserId(name, role);
-if (!userId) {
-return res.status(400).send("فشل في توليد userId."); // تأكد أن userId ليس null
-}
+    const userId = generateUserId(name, role);
+    if (!userId) {
+        return res.status(400).send("فشل في توليد userId.");
+    }
 
-const newUser = new User({ _id: userId, userId, email, password: hashedPassword, name, role });
+    const newUser = new User({ _id: userId, userId, email, password: hashedPassword, name, role });
 
-try {
-await newUser.save();
-res.status(201).send("نجاح التسجيل");
-} catch (error) {
-console.error("Error during registration:", error); // تحسين رسالة الخطأ
-res.status(500).send("خطأ في التسجيل");
-}
+    try {
+        await newUser.save();
+        res.status(201).send("نجاح التسجيل");
+    } catch (error) {
+        console.error("Error during registration:", error);
+        res.status(500).send("خطأ في التسجيل");
+    }
 });
 
 // تسجيل الدخول

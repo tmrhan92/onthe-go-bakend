@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
 
-// دالة لتوليد userId
+#// دالة لتوليد userId
 function generateUserId(name, role) {
 return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
 }
@@ -43,6 +43,7 @@ router.post('/register', async (req, res) => {
         res.status(500).send("خطأ في التسجيل");
     }
 });
+
 
 // تسجيل الدخول
 router.post('/login', async (req, res) => {

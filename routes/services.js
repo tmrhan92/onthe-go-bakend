@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
     subCategory,
     latitude,
     longitude,
-    therapistId, // تأكد من تعيين therapistId هنا
+    therapistId, 
   });
 
   try {
@@ -62,4 +62,36 @@ router.post('/', async (req, res) => {
     console.error("Error while adding service:", error);
     res.status(500).json({ message: "فشل في إضافة الخدمة" });
   }
-});module.exports = router;
+});
+// الحصول على تفاصيل خدمة معينة
+router.get('/:serviceId', async (req, res) => {
+  const { serviceId } = req.params;
+  try {
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ message: 'الخدمة غير موجودة' });
+    }
+    res.json(service);
+  } catch (error) {
+    res.status(500).json({ message: 'خطأ في تحميل تفاصيل الخدمة' });
+  }
+});
+
+// routes/services.js
+
+// الحصول على الخدمات حسب النوع
+router.get('/:serviceType', async (req, res) => {
+  const serviceType = decodeURIComponent(req.params.serviceType); // فك ترميز URL
+  try {
+    const services = await Service.find({ serviceType });
+    if (services.length === 0) {
+      return res.status(404).json({ message: 'لا توجد خدمات متاحة' });
+    }
+    res.json(services);
+  } catch (error) {
+    res.status(500).json({ message: 'خطأ في تحميل الخدمات' });
+  }
+});
+
+
+module.exports = router;

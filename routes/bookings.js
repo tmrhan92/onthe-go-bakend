@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
-const Service = require('../models/Service');
 const Notification = require('../models/Notification');
 const admin = require('firebase-admin');
 
 if (!admin.apps.length) {
-admin.initializeApp({
-credential: admin.credential.cert(require('../config/serviceAccountKey.json')),
-});
+  admin.initializeApp({
+    credential: admin.credential.cert(require('../config/serviceAccountKey.json')),
+  });
 }
 
 router.post('/', async (req, res) => {
@@ -21,7 +20,7 @@ router.post('/', async (req, res) => {
 
     // إنشاء الحجز
     const newBooking = new Booking({
-      userId,
+      userId, // استخدام userId بدلاً من therapistId
       serviceId,
       date: new Date(date),
       time,
@@ -29,16 +28,36 @@ router.post('/', async (req, res) => {
 
     const savedBooking = await newBooking.save();
 
-    // إنشاء الإشعار وحفظه في قاعدة البيانات
+    // إنشاء الإشعار
     const notification = new Notification({
-      userId: userId, // هنا يتم ربط الإشعار بالمستخدم
-      bookingId: savedBooking._id, // معرف الحجز
+      userId: userId, // الإشعار مرتبط بالمستخدم
+      bookingId: savedBooking._id,
       message: `تم حجز الخدمة بنجاح: ${serviceId}`,
     });
 
     await notification.save();
 
-    // استجابة النجاح
+    // إرسال إشعار Firebase (اختياري)
+    const message = {
+      notification: {
+        title: 'حجز جديد',
+        body: `تم حجز الخدمة بنجاح: ${serviceId}`,
+      },
+      data: {
+        bookingId: savedBooking._id.toString(),
+        userId: userId,
+        type: 'new_booking'
+      },
+      token: 'USER_FCM_TOKEN' // يمكنك استبدال هذا بقيمة FCM token الخاصة بالمستخدم
+    };
+
+    try {
+      const response = await admin.messaging().send(message);
+      console.log('Successfully sent notification:', response);
+    } catch (error) {
+      console.error('Error sending Firebase notification:', error);
+    }
+
     res.status(201).json({
       message: 'تم إنشاء الحجز بنجاح',
       booking: savedBooking,
@@ -48,4 +67,5 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام' });
   }
 });
+
 module.exports = router;

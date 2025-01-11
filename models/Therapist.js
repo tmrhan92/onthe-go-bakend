@@ -4,7 +4,6 @@ const TherapistSchema = new mongoose.Schema({
   _id: {
     type: String,
     required: true,
-    default: () => new mongoose.Types.ObjectId().toString(), // تعيين _id تلقائيًا
   },
   fcmToken: { type: String, unique: true }, // جعله اختياريًا
   name: { type: String, default: 'Pending Registration' },

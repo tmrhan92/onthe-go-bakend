@@ -39,7 +39,7 @@ app.use('/api/', apiLimiter);
 
 // تعريف المتغيرات
 const PORT = process.env.PORT || 5000;
-const HOST = '192.168.43.181';
+const HOST = '192.168.1.106';
 
 // إضافة مسارات الـ API
 app.use('/api/auth', authRoutes);

@@ -1,14 +1,16 @@
-
+// notification.model.js
 const mongoose = require('mongoose');
 
 const NotificationSchema = new mongoose.Schema({
   userId: {
     type: String,
-    required: true
+    required: true,
+    index: true
   },
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking'
+    ref: 'Booking',
+    required: true
   },
   message: {
     type: String,
@@ -21,11 +23,12 @@ const NotificationSchema = new mongoose.Schema({
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   }
 });
 
+// إضافة indices للتحسين
+NotificationSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Notification', NotificationSchema);
-
-
-

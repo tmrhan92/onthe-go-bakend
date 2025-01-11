@@ -14,7 +14,7 @@ duration: { type: Number, required: true },
 subCategory: { type: String, required: true }, // إضافة حقل الفئة الفرعية
 latitude: { type: Number, required: true },   // إحداثيات خط العرض
 longitude: { type: Number, required: true } ,   // إحداثيات خط الطول
-therapistId: { type: String, ref: 'Service', required: true }, // _id للخدمة
+therapistId: { type: String,  required: true }, // _id للخدمة
 
 });
 

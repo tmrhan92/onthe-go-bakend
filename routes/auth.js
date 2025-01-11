@@ -57,7 +57,7 @@ router.post('/login', async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+            return res.status(401).send(" تشفير.");
         }
 
         const token = jwt.sign({ userId: user.userId, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });

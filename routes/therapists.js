@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Therapist = require('../models/Therapist');
-const Service = require('../models/Service'); // تأكد من استيراد نموذج Service
-
+const Service = require('../models/Service');
 // حساب المسافة بين نقطتين جغرافيتين
 const getDistance = (lat1, lon1, lat2, lon2) => {
 const R = 6371;

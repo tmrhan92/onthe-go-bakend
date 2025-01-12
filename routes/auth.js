@@ -12,34 +12,43 @@ return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
     const { email, password, name, role } = req.body;
-
-    if (!email || !password || !name || !role) {
-        return res.status(400).send("جميع الحقول مطلوبة.");
-    }
-
-    if (!['طالب_خدمة', 'مقدم_خدمة'].includes(role)) {
-        return res.status(400).send("الدور غير صالح.");
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-        return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const userId = generateUserId(name, role);
-    if (!userId) {
-        return res.status(400).send("فشل في توليد userId.");
-    }
-
-    const newUser = new User({ _id: userId, userId, email, password: hashedPassword, name, role });
+    
+    // طباعة البيانات للتحقق
+    console.log('Registration attempt:', {
+        email,
+        name,
+        role
+    });
 
     try {
-        await newUser.save();
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const userId = generateUserId(name, role);
+        
+        const newUser = new User({
+            _id: userId,
+            userId,
+            email,
+            password: hashedPassword,
+            name,
+            role
+        });
+
+        // طباعة كائن المستخدم قبل الحفظ
+        console.log('User to be saved:', newUser);
+
+        const savedUser = await newUser.save();
+        // طباعة المستخدم المحفوظ
+        console.log('Saved user:', savedUser);
+
         res.status(201).send("نجاح التسجيل");
     } catch (error) {
         console.error("Error during registration:", error);
+        // طباعة تفاصيل الخطأ
+        if (error.code === 11000) {
+            // خطأ التكرار في البيانات الفريدة
+            console.log('Duplicate key error:', error.keyPattern);
+            return res.status(400).send("البريد الإلكتروني أو معرف المستخدم مستخدم بالفعل.");
+        }
         res.status(500).send("خطأ في التسجيل");
     }
 });

@@ -8,6 +8,11 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fcmRoutes = require('./routes/fcmRoutes');
 
+// Middleware لمعالجة JSON
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }

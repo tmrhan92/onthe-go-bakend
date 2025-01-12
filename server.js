@@ -8,7 +8,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fcmRoutes = require('./routes/fcmRoutes');
 
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
 
 const authRoutes = require('./routes/auth');
 const therapistRoutes = require('./routes/therapists');
@@ -16,7 +18,6 @@ const bookingRoutes = require('./routes/bookings');
 const serviceRoutes = require('./routes/services');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
-
 
 const app = express();
 
@@ -28,18 +29,23 @@ app.use(compression());
 app.use(morgan('dev'));
 app.use('/api', fcmRoutes);
 
+// تمكين trust proxy بشكل انتقائي (إذا لزم الأمر)
+app.set('trust proxy', 'loopback, 127.0.0.1, ::1');
 
 // Rate limiting
 const apiLimiter = rateLimit({
-windowMs: 15 * 60 * 1000, // 15 minutes
-max: 100, // Max 100 requests per IP
-message: 'Too many requests, please try again later.',
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Max 100 requests per IP
+    message: 'Too many requests, please try again later.',
+    keyGenerator: (req) => {
+        // استخدم رأس X-Forwarded-For إذا كان موجودًا
+        return req.headers['x-forwarded-for'] || req.ip;
+    },
 });
 app.use('/api/', apiLimiter);
 
 // تعريف المتغيرات
 const PORT = process.env.PORT || 5000;
-const HOST = '192.168.1.106';
 
 // إضافة مسارات الـ API
 app.use('/api/auth', authRoutes);
@@ -47,32 +53,34 @@ app.use('/api/therapists', therapistRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/notifications',notificationRoutes);
-
+app.use('/api/notifications', notificationRoutes);
 
 // مسار رئيسي
 app.get('/', (req, res) => {
-res.send('Welcome to the Massage API!');
+    res.send('Welcome to the Massage API!');
 });
 
 // مسار 404
 app.use((req, res, next) => {
-res.status(404).json({ error: 'Route not found' });
+    res.status(404).json({ error: 'Route not found' });
 });
 
 // معالجة الأخطاء العامة
 app.use((err, req, res, next) => {
-console.error(err.stack);
-res.status(500).json({ error: 'Internal Server Error' });
+    console.error(err.stack);
+    res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // الاتصال بقاعدة البيانات MongoDB
-mongoose.connect('mongodb://localhost:27017/massage_support')
-    .then(() => {
-console.log('MongoDB connected successfully');
-// بدء الخادم بعد الاتصال بنجاح بقاعدة البيانات
-app.listen(PORT, HOST, () => {
-console.log(`Server running on http://${HOST}:${PORT}`);
-});
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/massage_support', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
 })
-    .catch(err => console.error('MongoDB connection error:', err));
+.then(() => {
+    console.log('MongoDB connected successfully');
+    // بدء الخادم بعد الاتصال بنجاح بقاعدة البيانات
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+})
+.catch(err => console.error('MongoDB connection error:', err));

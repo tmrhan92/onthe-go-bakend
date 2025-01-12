@@ -11,65 +11,69 @@ return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
 
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
-const { email, password, name, role } = req.body;
+    const { email, password, name, role } = req.body;
+    
+    // طباعة البيانات للتحقق
+    console.log('Registration attempt:', {
+        email,
+        name,
+        role
+    });
 
-if (!email || !password || !name || !role) {
-return res.status(400).send("جميع الحقول مطلوبة.");
-}
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const userId = generateUserId(name, role);
+        
+        const newUser = new User({
+            _id: userId,
+            userId,
+            email,
+            password: hashedPassword,
+            name,
+            role
+        });
 
-if (!['طالب_خدمة', 'مقدم_خدمة'].includes(role)) {
-return res.status(400).send("الدور غير صالح.");
-}
+        // طباعة كائن المستخدم قبل الحفظ
+        console.log('User to be saved:', newUser);
 
-const existingUser = await User.findOne({ email });
-if (existingUser) {
-return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
-}
+        const savedUser = await newUser.save();
+        // طباعة المستخدم المحفوظ
+        console.log('Saved user:', savedUser);
 
-const hashedPassword = await bcrypt.hash(password, 10);
-
-// توليد userId كـ String
-const userId = generateUserId(name, role);
-if (!userId) {
-return res.status(400).send("فشل في توليد userId."); // تأكد أن userId ليس null
-}
-
-const newUser = new User({ _id: userId, userId, email, password: hashedPassword, name, role });
-
-try {
-await newUser.save();
-res.status(201).send("نجاح التسجيل");
-} catch (error) {
-console.error("Error during registration:", error); // تحسين رسالة الخطأ
-res.status(500).send("خطأ في التسجيل");
-}
+        res.status(201).send("نجاح التسجيل");
+    } catch (error) {
+        console.error("Error during registration:", error);
+        // طباعة تفاصيل الخطأ
+        if (error.code === 11000) {
+            // خطأ التكرار في البيانات الفريدة
+            console.log('Duplicate key error:', error.keyPattern);
+            return res.status(400).send("البريد الإلكتروني أو معرف المستخدم مستخدم بالفعل.");
+        }
+        res.status(500).send("خطأ في التسجيل");
+    }
 });
 
-// تسجيل الدخول
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
-const { email, password } = req.body;
-
-try {
-const user = await User.findOne({ email });
-
-if (!user) {
-return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-}
-
-const isMatch = await bcrypt.compare(password, user.password);
-if (!isMatch) {
-return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-}
-
-const token = jwt.sign({ userId: user.userId, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-// الآن أضف userId هنا
-res.json({ token, role: user.role, userId: user.userId }); // أضف userId هنا
-} catch (error) {
-console.error("Error during login:", error);
-res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
-}
+    const { email, password } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        console.log('User found:', user); // للتحقق من وجود المستخدم
+        
+        if (!user) {
+            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+        }
+        
+        const isMatch = await bcrypt.compare(password, user.password);
+        console.log('Password match:', isMatch); // للتحقق من تطابق كلمة المرور
+        
+        if (!isMatch) {
+            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+        }
+        // ... باقي الكود
+    } catch (error) {
+        console.error("Error during login:", error);
+        res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
+    }
 });
-
 module.exports = router;

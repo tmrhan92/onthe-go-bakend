@@ -47,26 +47,24 @@ router.post('/register', async (req, res) => {
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
-
     try {
         const user = await User.findOne({ email });
-
+        console.log('User found:', user); // للتحقق من وجود المستخدم
+        
         if (!user) {
             return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
         }
-
+        
         const isMatch = await bcrypt.compare(password, user.password);
+        console.log('Password match:', isMatch); // للتحقق من تطابق كلمة المرور
+        
         if (!isMatch) {
-            return res.status(401).send(" تشفير.");
+            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
         }
-
-        const token = jwt.sign({ userId: user.userId, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        res.json({ token, role: user.role, userId: user.userId });
+        // ... باقي الكود
     } catch (error) {
         console.error("Error during login:", error);
         res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
     }
 });
-
 module.exports = router;

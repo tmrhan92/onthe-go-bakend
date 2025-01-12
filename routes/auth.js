@@ -6,7 +6,7 @@ const router = express.Router();
 
 // دالة لتوليد userId
 function generateUserId(name, role) {
-return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
+    return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
 }
 
 // تسجيل المستخدم
@@ -20,14 +20,35 @@ router.post('/register', async (req, res) => {
         role
     });
 
+    if (!email || !password || !name || !role) {
+        return res.status(400).send("جميع الحقول مطلوبة.");
+    }
+
+    // تحويل البريد الإلكتروني إلى أحرف صغيرة وإزالة المسافات الزائدة
+    const normalizedEmail = email.toLowerCase().trim();
+
+    if (!['طالب_خدمة', 'مقدم_خدمة'].includes(role)) {
+        return res.status(400).send("الدور غير صالح.");
+    }
+
     try {
+        // التحقق من وجود المستخدم
+        const existingUser = await User.findOne({ email: normalizedEmail });
+        if (existingUser) {
+            return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const userId = generateUserId(name, role);
         
+        if (!userId) {
+            return res.status(400).send("فشل في توليد userId.");
+        }
+
         const newUser = new User({
             _id: userId,
             userId,
-            email,
+            email: normalizedEmail,
             password: hashedPassword,
             name,
             role
@@ -37,16 +58,12 @@ router.post('/register', async (req, res) => {
         console.log('User to be saved:', newUser);
 
         const savedUser = await newUser.save();
-        // طباعة المستخدم المحفوظ
         console.log('Saved user:', savedUser);
 
-        res.status(201).send("نجاح التسجيل");
+        res.status(201).send("تم التسجيل بنجاح");
     } catch (error) {
         console.error("Error during registration:", error);
-        // طباعة تفاصيل الخطأ
         if (error.code === 11000) {
-            // خطأ التكرار في البيانات الفريدة
-            console.log('Duplicate key error:', error.keyPattern);
             return res.status(400).send("البريد الإلكتروني أو معرف المستخدم مستخدم بالفعل.");
         }
         res.status(500).send("خطأ في التسجيل");
@@ -56,24 +73,51 @@ router.post('/register', async (req, res) => {
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
+
     try {
-        const user = await User.findOne({ email });
-        console.log('User found:', user); // للتحقق من وجود المستخدم
+        // تحويل البريد الإلكتروني إلى أحرف صغيرة وإزالة المسافات الزائدة
+        const normalizedEmail = email.toLowerCase().trim();
         
+        console.log('Login attempt with email:', normalizedEmail);
+        
+        // البحث عن المستخدم
+        const user = await User.findOne({ email: normalizedEmail });
+        console.log('Search query:', { email: normalizedEmail });
+        console.log('User found:', user);
+
         if (!user) {
             return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
         }
-        
+
         const isMatch = await bcrypt.compare(password, user.password);
-        console.log('Password match:', isMatch); // للتحقق من تطابق كلمة المرور
-        
+        console.log('Password comparison result:', isMatch);
+
         if (!isMatch) {
             return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
         }
-        // ... باقي الكود
+
+        // إنشاء التوكن
+        const token = jwt.sign(
+            { 
+                userId: user.userId, 
+                role: user.role 
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // إرسال الرد
+        res.json({ 
+            token,
+            role: user.role,
+            userId: user.userId,
+            name: user.name // إضافة اسم المستخدم للرد
+        });
+
     } catch (error) {
         console.error("Error during login:", error);
         res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
     }
 });
+
 module.exports = router;

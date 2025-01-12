@@ -9,6 +9,14 @@ function generateUserId(name, role) {
     return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
 }
 
+// Middleware للتحقق من Content-Type
+const checkContentType = (req, res, next) => {
+    console.log('Content-Type:', req.headers['content-type']);
+    if (req.headers['content-type'] !== 'application/json') {
+        return res.status(400).send('Content-Type must be application/json');
+    }
+    next();
+};
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
     const { email, password, name, role } = req.body;

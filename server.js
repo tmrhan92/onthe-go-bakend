@@ -8,17 +8,10 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fcmRoutes = require('./routes/fcmRoutes');
 
-if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config();
-}
+// تعريف المتغيرات
+const PORT = process.env.PORT || 5000;
 
-const authRoutes = require('./routes/auth');
-const therapistRoutes = require('./routes/therapists');
-const bookingRoutes = require('./routes/bookings');
-const serviceRoutes = require('./routes/services');
-const adminRoutes = require('./routes/admin');
-const notificationRoutes = require('./routes/notifications');
-
+// إنشاء تطبيق Express
 const app = express();
 
 // Middleware
@@ -27,10 +20,8 @@ app.use(bodyParser.json());
 app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
-app.use('/api', fcmRoutes);
-
-// تمكين trust proxy بشكل انتقائي (إذا لزم الأمر)
-app.set('trust proxy', 'loopback, 127.0.0.1, ::1');
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -44,16 +35,14 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// تعريف المتغيرات
-const PORT = process.env.PORT || 5000;
-
 // إضافة مسارات الـ API
-app.use('/api/auth', authRoutes);
-app.use('/api/therapists', therapistRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/services', serviceRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/notifications', notificationRoutes);
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/therapists', require('./routes/therapists'));
+app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/services', require('./routes/services'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api', fcmRoutes);
 
 // مسار رئيسي
 app.get('/', (req, res) => {

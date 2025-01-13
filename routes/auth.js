@@ -17,6 +17,17 @@ const checkContentType = (req, res, next) => {
     }
     next();
 };
+
+// routes/auth.js
+router.post('/update-fcm-token', async (req, res) => {
+    try {
+        const { userId, fcmToken } = req.body;
+        await User.findByIdAndUpdate(userId, { fcmToken });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
     const { email, password, name, role } = req.body;

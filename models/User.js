@@ -1,7 +1,14 @@
 const mongoose = require('mongoose');
 const { isEmail } = require('validator');
 
+
 const UserSchema = new mongoose.Schema({
+
+        _id: {
+        type: String, // تغيير النوع إلى String
+        required: true
+    },
+
     email: {
         type: String,
         required: [true, 'البريد الإلكتروني مطلوب'],

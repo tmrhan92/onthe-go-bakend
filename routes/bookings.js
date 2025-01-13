@@ -61,7 +61,7 @@ router.post('/', async (req, res) => {
         userId: userId,
         type: 'new_booking',
       },
-      token: 'USER_FCM_TOKEN', 
+      token: fcmToken, 
     };
 
     try {

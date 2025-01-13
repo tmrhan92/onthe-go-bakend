@@ -3,10 +3,16 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
 const admin = require('firebase-admin');
+const fs = require('fs');
 
+// تحميل Firebase
 if (!admin.apps.length) {
+  const serviceAccountPath = require.resolve('../config/serviceAccountKey.json');
+  if (!fs.existsSync(serviceAccountPath)) {
+    throw new Error('Service account key file not found!');
+  }
   admin.initializeApp({
-    credential: admin.credential.cert(require('../config/serviceAccountKey.json')),
+    credential: admin.credential.cert(require(serviceAccountPath)),
   });
 }
 
@@ -14,15 +20,22 @@ router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
 
+    // تحقق من الحقول المطلوبة
     if (!userId || !serviceId || !date || !time) {
       return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
 
+    // تحقق من صحة التاريخ
+    const bookingDate = new Date(date);
+    if (isNaN(bookingDate.getTime())) {
+      return res.status(400).json({ error: 'تاريخ غير صالح' });
+    }
+
     // إنشاء الحجز
     const newBooking = new Booking({
-      userId, // استخدام userId بدلاً من therapistId
+      userId,
       serviceId,
-      date: new Date(date),
+      date: bookingDate,
       time,
     });
 
@@ -30,7 +43,7 @@ router.post('/', async (req, res) => {
 
     // إنشاء الإشعار
     const notification = new Notification({
-      userId: userId, // الإشعار مرتبط بالمستخدم
+      userId,
       bookingId: savedBooking._id,
       message: `تم حجز الخدمة بنجاح: ${serviceId}`,
     });
@@ -46,9 +59,9 @@ router.post('/', async (req, res) => {
       data: {
         bookingId: savedBooking._id.toString(),
         userId: userId,
-        type: 'new_booking'
+        type: 'new_booking',
       },
-      token: 'USER_FCM_TOKEN' // يمكنك استبدال هذا بقيمة FCM token الخاصة بالمستخدم
+      token: 'USER_FCM_TOKEN', // استبدل هذا بقيمة FCM token الخاصة بالمستخدم
     };
 
     try {
@@ -56,11 +69,14 @@ router.post('/', async (req, res) => {
       console.log('Successfully sent notification:', response);
     } catch (error) {
       console.error('Error sending Firebase notification:', error);
+      // يمكنك إضافة إجراءات إضافية هنا، مثل تسجيل الخطأ في قاعدة البيانات
     }
 
+    // إرسال الاستجابة
     res.status(201).json({
       message: 'تم إنشاء الحجز بنجاح',
       booking: savedBooking,
+      notification: notification, // إضافة تفاصيل الإشعار
     });
   } catch (error) {
     console.error('Error creating booking:', error);

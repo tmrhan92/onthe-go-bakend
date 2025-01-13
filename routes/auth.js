@@ -22,6 +22,10 @@ const checkContentType = (req, res, next) => {
 router.post('/update-fcm-token', async (req, res) => {
     try {
         const { userId, fcmToken } = req.body;
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+        }
         await User.findByIdAndUpdate(userId, { fcmToken });
         res.json({ success: true });
     } catch (error) {

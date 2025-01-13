@@ -61,7 +61,7 @@ router.post('/', async (req, res) => {
         userId: userId,
         type: 'new_booking',
       },
-      token: 'USER_FCM_TOKEN', // استبدل هذا بقيمة FCM token الخاصة بالمستخدم
+      token: fcmToken, 
     };
 
     try {

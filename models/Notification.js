@@ -1,4 +1,3 @@
-// notification.model.js
 const mongoose = require('mongoose');
 
 const NotificationSchema = new mongoose.Schema({
@@ -18,7 +17,7 @@ const NotificationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected'],
+    enum: ['pending', 'accepted', 'rejected', 'unread'], // إضافة 'unread'
     default: 'pending'
   },
   createdAt: {

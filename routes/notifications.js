@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
         userId: userId,
         type: 'new_booking'
       },
-      token: fcmToken, // يجب استبدالها بتوكن المستخدم الفعلي
+      token: 'USER_FCM_TOKEN', // يجب استبدالها بتوكن المستخدم الفعلي
     };
 
     try {

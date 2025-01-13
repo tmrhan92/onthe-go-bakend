@@ -24,6 +24,11 @@ name: {
 type: String,
 required: true
 },
+      fcmToken: {
+        type: String,
+        default: null
+    },
+
 role: {
 type: String,
 enum: ['طالب_خدمة', 'مقدم_خدمة'],

@@ -8,6 +8,12 @@ const UserSchema = new mongoose.Schema({
         type: String, // تغيير النوع إلى String
         required: true
     },
+        userId: {
+type: String,
+required: true,
+unique: true // تأكد من أنه فريد
+},
+
 
     email: {
         type: String,

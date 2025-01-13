@@ -7,9 +7,11 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fcmRoutes = require('./routes/fcmRoutes');
+require('dotenv').config(); // تحميل المتغيرات البيئية من ملف .env
 
 // تعريف المتغيرات
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/massage_support';
 
 // إنشاء تطبيق Express
 const app = express();
@@ -61,15 +63,28 @@ app.use((err, req, res, next) => {
 });
 
 // الاتصال بقاعدة البيانات MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/massage_support', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-.then(() => {
-    console.log('MongoDB connected successfully');
-    // بدء الخادم بعد الاتصال بنجاح بقاعدة البيانات
+const connectToDatabase = async () => {
+    try {
+        await mongoose.connect(MONGODB_URI);
+        console.log('MongoDB connected successfully');
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        process.exit(1); // إغلاق التطبيق في حالة فشل الاتصال
+    }
+};
+
+// بدء الخادم
+const startServer = () => {
     app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
     });
-})
-.catch(err => console.error('MongoDB connection error:', err));
+};
+
+// تهيئة التطبيق
+const initializeApp = async () => {
+    await connectToDatabase();
+    startServer();
+};
+
+// تشغيل التطبيق
+initializeApp();

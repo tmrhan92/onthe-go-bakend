@@ -29,6 +29,12 @@ type: String,
 enum: ['طالب_خدمة', 'مقدم_خدمة'],
 required: true
 },
+
+      fcmToken: {
+        type: String,
+        default: null
+    }
+
 createdAt: {
 type: Date,
 default: Date.now

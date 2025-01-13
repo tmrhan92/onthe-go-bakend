@@ -3,36 +3,63 @@ const router = express.Router();
 const Therapist = require('../models/Therapist');
 
 router.post('/fcm/token', async (req, res) => {
-console.log('Received token save request:', req.body);
+  console.log('Received token save request:', req.body);
 
-try {
-const { fcmToken, name = 'Pending Registration', serviceType = 'Pending' } = req.body;
+  try {
+    const { fcmToken, userId, role, _id } = req.body;
 
-if (!fcmToken) {
-console.log('No token provided');
-return res.status(400).json({ error: 'FCM token is required' });
-}
+    if (!fcmToken || !userId || !role) {
+      return res.status(400).json({ error: 'Required fields missing' });
+    }
 
-// البحث عن معالج موجود بنفس التوكن
-let existingTherapist = await Therapist.findOne({ fcmToken });
+    // Update the user's FCM token
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { fcmToken: fcmToken },
+      { new: true }
+    );
 
-if (existingTherapist) {
-console.log('Found existing therapist:', existingTherapist._id);
-return res.status(200).json({
-message: 'Token already exists',
-therapistId: existingTherapist._id
-});
-}
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-// إنشاء معالج جديد
-const newTherapist = new Therapist({
-fcmToken,
-name,
-serviceType,
-location: {
-type: 'Point',
-coordinates: [0, 0] // قيمة افتراضية للإحداثيات
-}
+    // If the user is a therapist, also update or create therapist record
+    if (role === 'مقدم_خدمة') {
+      let therapist = await Therapist.findOne({ userId: userId });
+
+      if (therapist) {
+        therapist.fcmToken = fcmToken;
+        await therapist.save();
+      } else {
+        therapist = new Therapist({
+          _id: userId, // Use userId as _id
+          userId: userId,
+          fcmToken: fcmToken,
+          name: updatedUser.name,
+          serviceType: 'Pending'
+        });
+        await therapist.save();
+      }
+
+      return res.status(200).json({
+        message: 'Token saved successfully',
+        therapistId: therapist._id,
+        userId: userId
+      });
+    }
+
+    res.status(200).json({
+      message: 'Token saved successfully',
+      userId: userId
+    });
+
+  } catch (error) {
+    console.error('Error saving token:', error);
+    res.status(500).json({
+      error: 'Failed to save token',
+      details: error.message
+    });
+  }
 });
 
 console.log('Attempting to save new therapist...');

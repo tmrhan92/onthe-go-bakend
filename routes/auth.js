@@ -5,9 +5,10 @@ const User = require('../models/User');
 const router = express.Router();
 
 // دالة لتوليد userId
-function generateUserId(name, role) {
-    return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}`;
-}
+const generateUserId = (name, role) => {
+  const timestamp = Date.now(); // إضافة الطابع الزمني
+  return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}_${timestamp}`;
+};
 
 // Middleware للتحقق من Content-Type
 const checkContentType = (req, res, next) => {

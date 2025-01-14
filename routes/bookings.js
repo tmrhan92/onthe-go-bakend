@@ -3,29 +3,41 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Service = require('../models/Service');
 const admin = require('firebase-admin');
 
 // تهيئة Firebase Admin SDK
+const firebaseConfig = {
+  type: 'service_account',
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
+};
+
+if (!firebaseConfig.private_key) {
+  throw new Error('FIREBASE_PRIVATE_KEY is missing or invalid in environment variables.');
+}
+
 admin.initializeApp({
-  credential: admin.credential.cert({
-    type: 'service_account',
-    project_id: process.env.FIREBASE_PROJECT_ID,
-    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    client_id: process.env.FIREBASE_CLIENT_ID,
-    auth_uri: process.env.FIREBASE_AUTH_URI,
-    token_uri: process.env.FIREBASE_TOKEN_URI,
-    auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-    client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
-  })
+  credential: admin.credential.cert(firebaseConfig)
 });
 
 // دالة مساعدة لإرسال الإشعارات
 async function sendNotification(userId, title, body, data = {}) {
   try {
     const user = await User.findById(userId);
-    if (!user || !user.fcmToken) {
+    if (!user) {
+      console.log('User not found:', userId);
+      return;
+    }
+
+    if (!user.fcmToken) {
       console.log('No FCM token found for user:', userId);
       return;
     }
@@ -35,6 +47,8 @@ async function sendNotification(userId, title, body, data = {}) {
       data: { ...data, timestamp: new Date().toISOString() },
       token: user.fcmToken
     };
+
+    console.log('Sending notification with payload:', message);
 
     const response = await admin.messaging().send(message);
     console.log('Notification sent successfully:', response);
@@ -65,6 +79,12 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
     }
 
+    // التحقق من وجود الخدمة
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ success: false, message: 'الخدمة غير موجودة' });
+    }
+
     // إنشاء الحجز
     const newBooking = new Booking({
       userId,
@@ -76,6 +96,7 @@ router.post('/', async (req, res) => {
 
     // حفظ الحجز
     const savedBooking = await newBooking.save();
+    console.log('Booking created successfully:', savedBooking);
 
     // إنشاء وحفظ الإشعار
     const notification = new Notification({
@@ -86,6 +107,7 @@ router.post('/', async (req, res) => {
     });
 
     await notification.save();
+    console.log('Notification created successfully:', notification);
 
     // محاولة إرسال إشعار Firebase
     try {
@@ -123,6 +145,12 @@ router.get('/:userId', async (req, res) => {
 
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // التحقق من وجود المستخدم
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
     const notifications = await Notification.find({ userId })
@@ -190,7 +218,7 @@ router.post('/:notificationId/status', async (req, res) => {
       );
     }
 
-    console.log('Successfully updated notification status');
+    console.log('Successfully updated notification:', notification);
 
     res.json({
       message: 'تم تحديث الحالة بنجاح',
@@ -204,6 +232,16 @@ router.post('/:notificationId/status', async (req, res) => {
       details: error.message 
     });
   }
+});
+
+// معالجة الأخطاء العامة
+router.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    success: false,
+    message: 'حدث خطأ غير متوقع في النظام',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 module.exports = router;

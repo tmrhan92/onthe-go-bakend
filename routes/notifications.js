@@ -41,17 +41,28 @@ router.post('/', async (req, res) => {
       notification: {
         title: 'حجز جديد',
         body: `تم حجز الخدمة بنجاح: ${serviceId}`,
+        android: {
+          priority: 'high',
+          notification: {
+            channel_id: 'default'
+          }
+        }
       },
       data: {
         bookingId: savedBooking._id.toString(),
         userId: userId,
         type: 'new_booking'
       },
-        token: user.fcmToken
+      token: user.fcmToken
     };
 
     try {
       const response = await admin.messaging().send(message);
+      if (!response) {
+        console.error('Empty response from FCM');
+        return;
+      }
+      console.log('Full FCM response:', response);
       console.log('Successfully sent notification:', response);
     } catch (error) {
       console.error('Error sending Firebase notification:', error);
@@ -68,6 +79,7 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
+
 
 // Get notifications for a user
 router.get('/:userId', async (req, res) => {

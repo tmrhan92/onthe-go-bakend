@@ -6,16 +6,14 @@ const User = require('../models/User');
 const admin = require('firebase-admin');
 
 // تهيئة Firebase Admin SDK
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp({
-            credential: admin.credential.cert(require('../config/serviceAccountKey.json'))
-        });
-        console.log('Firebase Admin initialized successfully');
-    } catch (error) {
-        console.error('Firebase Admin initialization error:', error);
-    }
-}
+admin.initializeApp({
+  credential: admin.credential.cert({
+    type: 'service_account',
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+    client_email: process.env.FIREBASE_CLIENT_EMAIL
+  })
+});
 
 // دالة مساعدة لإرسال الإشعارات
 async function sendNotification(userId, title, body, data = {}) {

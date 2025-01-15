@@ -29,13 +29,26 @@ admin.initializeApp({
 });
 
 // دالة مساعدة لإرسال الإشعارات
-async function sendNotification(fcmToken, title, body, data = {}) {
+async function sendNotification(userId, title, body, data = {}) {
   try {
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('User not found:', userId);
+      return;
+    }
+
+    if (!user.fcmToken) {
+      console.log('No FCM token found for user:', userId);
+      return;
+    }
+
     const message = {
       notification: { title, body },
       data: { ...data, timestamp: new Date().toISOString() },
-      token: fcmToken,
+      token: user.fcmToken
     };
+
+    console.log('Sending notification with payload:', message);
 
     const response = await admin.messaging().send(message);
     console.log('Notification sent successfully:', response);

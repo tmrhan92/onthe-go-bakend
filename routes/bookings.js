@@ -29,13 +29,23 @@ admin.initializeApp({
 });
 
 // دالة مساعدة لإرسال الإشعارات
-// دالة مساعدة لإرسال الإشعارات
 async function sendNotification(userId, title, body, data = {}) {
   try {
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('User not found:', userId);
+      return;
+    }
+
+    if (!user.fcmToken) {
+      console.log('No FCM token found for user:', userId);
+      return;
+    }
+
     const message = {
       notification: { title, body },
       data: { ...data, timestamp: new Date().toISOString() },
-      token: fcmToken,
+      token: user.fcmToken
     };
 
     console.log('Sending notification with payload:', message);
@@ -49,38 +59,6 @@ async function sendNotification(userId, title, body, data = {}) {
   }
 }
 
-// مسار لحفظ FCM Token
-router.post('/save-fcm-token', async (req, res) => {
-  const { fcmToken, userId, role } = req.body;
-  console.log('Received token save request:', req.body);
-
-  try {
-    if (!fcmToken) {
-      return res.status(400).json({ error: 'FCM token is required' });
-    }
-
-    let tokenDoc = await Therapist.findOne({ fcmToken });
-
-    if (!tokenDoc) {
-      tokenDoc = new Therapist({
-        fcmToken,
-        name: 'Temporary Therapist',
-        serviceType: 'Pending',
-      });
-    }
-
-    tokenDoc.fcmToken = fcmToken;
-    await tokenDoc.save();
-
-    res.status(200).json({
-      message: 'FCM token saved successfully',
-      therapistId: tokenDoc._id
-    });
-  } catch (error) {
-    console.error('Error saving FCM token:', error);
-    res.status(500).json({ error: 'Failed to save FCM token' });
-  }
-});
 
 // مسار لإرسال إشعار
 router.post('/send-notification', async (req, res) => {

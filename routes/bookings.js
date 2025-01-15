@@ -30,7 +30,7 @@ admin.initializeApp({
 
 // دالة مساعدة لإرسال الإشعارات
 // دالة مساعدة لإرسال الإشعارات
-async function sendNotification(fcmToken, title, body, data = {}) {
+async function sendNotification(userId, title, body, data = {}) {
   try {
     const message = {
       notification: { title, body },

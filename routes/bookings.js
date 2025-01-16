@@ -29,35 +29,38 @@ admin.initializeApp({
 });
 
 // دالة مساعدة لإرسال الإشعارات
-async function sendNotification(userId, title, body, data = {}) {
-  try {
-    const user = await User.findById(userId);
-    if (!user) {
-      console.log('User not found:', userId);
-      return;
+async function sendNotification(userId, title, body, data = {}, therapistId = null) {
+    try {
+        // إرسال الإشعار للمستخدم
+        if (userId) {
+            const user = await User.findById(userId);
+            if (user && user.fcmToken) {
+                await admin.messaging().send({
+                    notification: { title, body },
+                    data: { ...data, timestamp: new Date().toISOString() },
+                    token: user.fcmToken
+                });
+            }
+        }
+
+        // إرسال الإشعار لمقدم الخدمة
+        if (therapistId) {
+            const therapist = await Therapist.findById(therapistId);
+            if (therapist && therapist.fcmToken) {
+                await admin.messaging().send({
+                    notification: { title, body },
+                    data: { ...data, timestamp: new Date().toISOString() },
+                    token: therapist.fcmToken
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error sending notification:', error);
+        throw error;
     }
-
-    if (!user.fcmToken) {
-      console.log('No FCM token found for user:', userId);
-      return;
-    }
-
-    const message = {
-      notification: { title, body },
-      data: { ...data, timestamp: new Date().toISOString() },
-      token: user.fcmToken
-    };
-
-    console.log('Sending notification with payload:', message);
-
-    const response = await admin.messaging().send(message);
-    console.log('Notification sent successfully:', response);
-    return response;
-  } catch (error) {
-    console.error('Error sending notification:', error);
-    throw error;
-  }
 }
+
+
 
 
 // مسار لإرسال إشعار
@@ -75,82 +78,70 @@ router.post('/send-notification', async (req, res) => {
 
 // إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
-  try {
-    const { userId, serviceId, date, time } = req.body;
-
-    // التحقق من البيانات المطلوبة
-    if (!userId || !serviceId || !date || !time) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'جميع الحقول مطلوبة',
-        missingFields: { userId: !userId, serviceId: !serviceId, date: !date, time: !time }
-      });
-    }
-
-    // التحقق من وجود المستخدم
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
-    }
-
-    // التحقق من وجود الخدمة
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ success: false, message: 'الخدمة غير موجودة' });
-    }
-
-    // إنشاء الحجز
-    const newBooking = new Booking({
-      userId,
-      serviceId,
-      date: new Date(date),
-      time,
-      status: 'pending' // حالة الحجز الأولية
-    });
-
-    // حفظ الحجز
-    const savedBooking = await newBooking.save();
-    console.log('Booking created successfully:', savedBooking);
-
-    // إنشاء وحفظ الإشعار
-    const notification = new Notification({
-      userId,
-      bookingId: savedBooking._id,
-      message: `تم حجز الخدمة بنجاح: ${serviceId}`,
-      status: 'unread' // استخدام 'unread' كقيمة مسموح بها
-    });
-
-    await notification.save();
-    console.log('Notification created successfully:', notification);
-
-    // محاولة إرسال إشعار Firebase
     try {
-      await sendNotification(
-        userId,
-        'حجز جديد',
-        `تم حجز الخدمة بنجاح: ${serviceId}`,
-        { bookingId: savedBooking._id.toString(), type: 'new_booking' }
-      );
-    } catch (notificationError) {
-      console.error('Failed to send Firebase notification:', notificationError);
+        const { userId, serviceId, date, time } = req.body;
+
+        // إضافة التحقق من وجود الخدمة ومقدم الخدمة
+        const service = await Service.findById(serviceId);
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'الخدمة غير موجودة' });
+        }
+
+        const therapistId = service.therapistId; // افترض أن الخدمة تحتوي على معرف مقدم الخدمة
+
+        // إنشاء الحجز كما هو
+        const newBooking = new Booking({
+            userId,
+            serviceId,
+            therapistId, // إضافة معرف مقدم الخدمة
+            date: new Date(date),
+            time,
+            status: 'pending'
+        });
+
+        const savedBooking = await newBooking.save();
+
+        // إنشاء إشعار للمستخدم ومقدم الخدمة
+        await sendNotification(
+            userId,
+            'تأكيد الحجز',
+            `تم حجز الخدمة ${service.name} بنجاح`,
+            { 
+                bookingId: savedBooking._id.toString(),
+                type: 'new_booking',
+                serviceId: serviceId
+            }
+        );
+
+        await sendNotification(
+            null,
+            'طلب حجز جديد',
+            `لديك طلب حجز جديد من ${user.name}`,
+            { 
+                bookingId: savedBooking._id.toString(),
+                type: 'new_booking_request',
+                serviceId: serviceId,
+                userId: userId
+            },
+            therapistId
+        );
+
+        // الرد كما هو
+        res.status(201).json({
+            success: true,
+            message: 'تم إنشاء الحجز بنجاح',
+            booking: savedBooking
+        });
+
+    } catch (error) {
+        console.error('Error in booking creation:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في النظام',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
-
-    res.status(201).json({
-      success: true,
-      message: 'تم إنشاء الحجز بنجاح',
-      booking: savedBooking,
-    });
-
-  } catch (error) {
-    console.error('Error in booking creation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'حدث خطأ في النظام',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
 });
-
 // الحصول على إشعارات مستخدم معين
 router.get('/:userId', async (req, res) => {
   try {

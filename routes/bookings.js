@@ -81,75 +81,85 @@ router.post('/send-notification', async (req, res) => {
 // إنشاء حجز وإشعار
 // إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
-    try {
-        const { userId, serviceId, date, time } = req.body;
+  try {
+    const { userId, serviceId, date, time } = req.body;
 
-        // جلب بيانات المستخدم
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
-        }
-
-        // إضافة التحقق من وجود الخدمة ومقدم الخدمة
-        const service = await Service.findById(serviceId);
-        if (!service) {
-            return res.status(404).json({ success: false, message: 'الخدمة غير موجودة' });
-        }
-
-        const therapistId = service.therapistId; // افترض أن الخدمة تحتوي على معرف مقدم الخدمة
-
-        // إنشاء الحجز كما هو
-        const newBooking = new Booking({
-            userId,
-            serviceId,
-            therapistId, // إضافة معرف مقدم الخدمة
-            date: new Date(date),
-            time,
-            status: 'pending'
-        });
-
-        const savedBooking = await newBooking.save();
-
-        // إنشاء إشعار للمستخدم ومقدم الخدمة
-        await sendNotification(
-            userId,
-            'تأكيد الحجز',
-            `تم حجز الخدمة ${service.name} بنجاح`,
-            { 
-                bookingId: savedBooking._id.toString(),
-                type: 'new_booking',
-                serviceId: serviceId
-            }
-        );
-
-        await sendNotification(
-            null,
-            'طلب حجز جديد',
-            `لديك طلب حجز جديد من ${user.name}`, // استخدام user.name بعد جلب بيانات المستخدم
-            { 
-                bookingId: savedBooking._id.toString(),
-                type: 'new_booking_request',
-                serviceId: serviceId,
-                userId: userId
-            },
-            therapistId
-        );
-
-        // الرد كما هو
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء الحجز بنجاح',
-            booking: savedBooking
-        });
-
-    } catch (error) {
-        console.error('Error in booking creation:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في النظام',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+    if (!userId || !serviceId || !date || !time) {
+      return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
+
+    // إنشاء الحجز
+    const newBooking = new Booking({
+      userId,
+      serviceId,
+      date: new Date(date),
+      time,
+      status: 'pending'
+    });
+
+    const savedBooking = await newBooking.save();
+
+    // جلب تفاصيل الخدمة
+    const service = await Service.findById(serviceId);
+
+    if (!service) {
+      return res.status(404).json({ error: 'الخدمة غير موجودة' });
+    }
+
+    // إنشاء الإشعار
+    const notification = new Notification({
+      userId: userId,
+      bookingId: savedBooking._id,
+      message: `تم حجز الخدمة بنجاح: ${service.name}`,
+      status: 'pending',
+      createdAt: new Date()
+    });
+
+    await notification.save();
+
+    // إرسال إشعار Firebase
+    const message = {
+      notification: {
+        title: 'حجز جديد',
+        body: `تم حجز الخدمة بنجاح: ${service.name}`,
+        android: {
+          priority: 'high',
+          notification: {
+            channel_id: 'default'
+          }
+        }
+      },
+      data: {
+        bookingId: savedBooking._id.toString(),
+        userId: userId,
+        type: 'new_booking'
+      },
+      token: user.fcmToken
+    };
+
+    try {
+      const response = await admin.messaging().send(message);
+      if (!response) {
+        console.error('Empty response from FCM');
+        return;
+      }
+      console.log('Full FCM response:', response);
+      console.log('Successfully sent notification:', response);
+    } catch (error) {
+      console.error('Error sending Firebase notification:', error);
+    }
+
+    res.status(201).json({
+      message: 'تم إنشاء الحجز بنجاح',
+      booking: savedBooking,
+      notification: notification,
+      serviceDetails: service, // إضافة تفاصيل الخدمة
+    });
+
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
+  }
 });
 // الحصول على إشعارات مستخدم معين
 router.get('/:userId', async (req, res) => {

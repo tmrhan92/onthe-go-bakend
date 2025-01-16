@@ -3,15 +3,23 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
 const Service = require('../models/Service');
+const User = require('../models/User'); // تأكد من استيراد نموذج User
+const Therapist = require('../models/Therapist'); // تأكد من استيراد نموذج Therapist
 const admin = require('firebase-admin');
 
-// Create booking and notification
+// إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
 
     if (!userId || !serviceId || !date || !time) {
       return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+    }
+
+    // التحقق من وجود الخدمة
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ error: 'الخدمة غير موجودة' });
     }
 
     // إنشاء الحجز
@@ -29,24 +37,29 @@ router.post('/', async (req, res) => {
     const notification = new Notification({
       userId: userId,
       bookingId: savedBooking._id,
-      message: `تم حجز الخدمة بنجاح: ${serviceId}`,
+      message: `تم حجز الخدمة بنجاح: ${service.name}`,
       status: 'pending',
       createdAt: new Date()
     });
 
     await notification.save();
 
+    // جلب FCM Token من قاعدة البيانات
+    const user = await User.findById(userId);
+    if (!user || !user.fcmToken) {
+      console.error('لم يتم العثور على FCM Token للمستخدم');
+      return res.status(201).json({
+        message: 'تم إنشاء الحجز بنجاح',
+        booking: savedBooking,
+        notification: notification
+      });
+    }
+
     // إرسال إشعار Firebase
     const message = {
       notification: {
         title: 'حجز جديد',
-        body: `تم حجز الخدمة بنجاح: ${serviceId}`,
-        android: {
-          priority: 'high',
-          notification: {
-            channel_id: 'default'
-          }
-        }
+        body: `تم حجز الخدمة بنجاح: ${service.name}`,
       },
       data: {
         bookingId: savedBooking._id.toString(),
@@ -58,11 +71,6 @@ router.post('/', async (req, res) => {
 
     try {
       const response = await admin.messaging().send(message);
-      if (!response) {
-        console.error('Empty response from FCM');
-        return;
-      }
-      console.log('Full FCM response:', response);
       console.log('Successfully sent notification:', response);
     } catch (error) {
       console.error('Error sending Firebase notification:', error);
@@ -79,55 +87,21 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
-const getNotifications = async (req, res) => {
-  try {
-    const userId = req.params.userId;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-
-    const notifications = await Notification.find({ userId })
-      .sort({ createdAt: -1 })
-      .populate({
-        path: 'bookingId',
-        populate: {
-          path: 'serviceId',
-          model: 'Service',
-        },
-      });
-
-    const formattedNotifications = notifications.map((notification) => ({
-      id: notification._id,
-      userId: notification.userId,
-      message: notification.message,
-      status: notification.status,
-      createdAt: notification.createdAt,
-      bookingDetails: notification.bookingId,
-      serviceDetails: notification.bookingId?.serviceId,
-    }));
-
-    res.status(200).json(formattedNotifications);
-  } catch (error) {
-    console.error('Error fetching notifications:', error);
-    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
-  }
-};
-
-module.exports = {
-  getNotifications,
-};
-
-
-// Get notifications for a user
-// routes/notifications.js
+// جلب الإشعارات للمستخدم
 router.get('/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
     console.log('Fetching notifications for userId:', userId);
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json({ error: 'userId مطلوب' });
+    }
+
+    // التحقق من وجود المستخدم
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
     const notifications = await Notification.find({ userId })
@@ -156,11 +130,18 @@ router.get('/:userId', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
-// في ملف routes/notifications.js
+
+// جلب الإشعارات لمقدم الخدمة
 router.get('/therapist/:therapistId', async (req, res) => {
   try {
     const therapistId = req.params.therapistId;
     console.log('Fetching notifications for therapistId:', therapistId);
+
+    // التحقق من وجود مقدم الخدمة
+    const therapist = await Therapist.findById(therapistId);
+    if (!therapist) {
+      return res.status(404).json({ error: 'مقدم الخدمة غير موجود' });
+    }
 
     // البحث عن الحجوزات المرتبطة بمقدم الخدمة
     const bookings = await Booking.find({ therapistId }).populate('serviceId userId');
@@ -200,7 +181,7 @@ router.get('/therapist/:therapistId', async (req, res) => {
   }
 });
 
-// Update notification status
+// تحديث حالة الإشعار
 router.post('/:notificationId/status', async (req, res) => {
   try {
     const { notificationId } = req.params;
@@ -247,12 +228,13 @@ router.post('/:notificationId/status', async (req, res) => {
   }
 });
 
-// Get notifications for a service
+// جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {
   try {
     const serviceId = req.params.serviceId;
     console.log('Fetching notifications for serviceId:', serviceId);
 
+    // التحقق من وجود الخدمة
     const service = await Service.findById(serviceId);
     if (!service) {
       return res.status(404).json({ message: 'الخدمة غير موجودة' });

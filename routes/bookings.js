@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
+const Therapist = require('../models/Therapist'); // استيراد نموذج Therapist
+
 const User = require('../models/User');
 const Service = require('../models/Service');
 const admin = require('firebase-admin');

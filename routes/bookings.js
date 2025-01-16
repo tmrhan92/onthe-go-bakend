@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
             return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
         }
 
-        // إضافة التحقق من وجود الخدمة ومقدم الخدمة
+        // التحقق من وجود الخدمة
         const service = await Service.findById(serviceId);
         if (!service) {
             return res.status(404).json({ success: false, message: 'الخدمة غير موجودة' });
@@ -98,7 +98,7 @@ router.post('/', async (req, res) => {
 
         const therapistId = service.therapistId; // افترض أن الخدمة تحتوي على معرف مقدم الخدمة
 
-        // إنشاء الحجز كما هو
+        // إنشاء الحجز
         const newBooking = new Booking({
             userId,
             serviceId,
@@ -110,22 +110,26 @@ router.post('/', async (req, res) => {
 
         const savedBooking = await newBooking.save();
 
-        // إنشاء إشعار للمستخدم ومقدم الخدمة
-        await sendNotification(
-            userId,
-            'تأكيد الحجز',
-            `تم حجز الخدمة ${service.name} بنجاح`,
-            { 
-                bookingId: savedBooking._id.toString(),
-                type: 'new_booking',
-                serviceId: serviceId
-            }
-        );
+        // إنشاء إشعار للمستخدم
+       await sendNotification(
+    userId,
+    'تأكيد الحجز',
+    `تم حجز الخدمة ${service.name} بنجاح`,
+    { 
+        bookingId: savedBooking._id.toString(),
+        type: 'new_booking',
+        serviceId: serviceId.toString(), // تحويل إلى نص
+        serviceName: service.name, // اسم الخدمة (نص)
+        serviceDescription: service.description, // وصف الخدمة (نص)
+        servicePrice: service.price.toString() // تحويل السعر إلى نص
+    }
+);
 
+        // إنشاء إشعار لمقدم الخدمة
         await sendNotification(
             null,
             'طلب حجز جديد',
-            `لديك طلب حجز جديد من ${user.name}`, // استخدام user.name بعد جلب بيانات المستخدم
+            `لديك طلب حجز جديد من ${user.name}`,
             { 
                 bookingId: savedBooking._id.toString(),
                 type: 'new_booking_request',
@@ -135,11 +139,11 @@ router.post('/', async (req, res) => {
             therapistId
         );
 
-        // الرد كما هو
         res.status(201).json({
             success: true,
             message: 'تم إنشاء الحجز بنجاح',
-            booking: savedBooking
+            booking: savedBooking,
+            service: service // إرسال تفاصيل الخدمة في الاستجابة
         });
 
     } catch (error) {

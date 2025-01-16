@@ -77,9 +77,16 @@ router.post('/send-notification', async (req, res) => {
 });
 
 // إنشاء حجز وإشعار
+// إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
     try {
         const { userId, serviceId, date, time } = req.body;
+
+        // جلب بيانات المستخدم
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
+        }
 
         // إضافة التحقق من وجود الخدمة ومقدم الخدمة
         const service = await Service.findById(serviceId);
@@ -116,7 +123,7 @@ router.post('/', async (req, res) => {
         await sendNotification(
             null,
             'طلب حجز جديد',
-            `لديك طلب حجز جديد من ${user.name}`,
+            `لديك طلب حجز جديد من ${user.name}`, // استخدام user.name بعد جلب بيانات المستخدم
             { 
                 bookingId: savedBooking._id.toString(),
                 type: 'new_booking_request',

@@ -79,6 +79,44 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
+const getNotifications = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const notifications = await Notification.find({ userId })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'bookingId',
+        populate: {
+          path: 'serviceId',
+          model: 'Service',
+        },
+      });
+
+    const formattedNotifications = notifications.map((notification) => ({
+      id: notification._id,
+      userId: notification.userId,
+      message: notification.message,
+      status: notification.status,
+      createdAt: notification.createdAt,
+      bookingDetails: notification.bookingId,
+      serviceDetails: notification.bookingId?.serviceId,
+    }));
+
+    res.status(200).json(formattedNotifications);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
+  }
+};
+
+module.exports = {
+  getNotifications,
+};
 
 
 // Get notifications for a user

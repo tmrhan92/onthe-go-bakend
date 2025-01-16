@@ -111,19 +111,19 @@ router.post('/', async (req, res) => {
         const savedBooking = await newBooking.save();
 
         // إنشاء إشعار للمستخدم
-        await sendNotification(
-            userId,
-            'تأكيد الحجز',
-            `تم حجز الخدمة ${service.name} بنجاح`,
-            { 
-                bookingId: savedBooking._id.toString(),
-                type: 'new_booking',
-                serviceId: serviceId,
-                serviceName: service.name, // اسم الخدمة
-                serviceDescription: service.description, // وصف الخدمة
-                servicePrice: service.price // سعر الخدمة
-            }
-        );
+       await sendNotification(
+    userId,
+    'تأكيد الحجز',
+    `تم حجز الخدمة ${service.name} بنجاح`,
+    { 
+        bookingId: savedBooking._id.toString(),
+        type: 'new_booking',
+        serviceId: serviceId.toString(), // تحويل إلى نص
+        serviceName: service.name, // اسم الخدمة (نص)
+        serviceDescription: service.description, // وصف الخدمة (نص)
+        servicePrice: service.price.toString() // تحويل السعر إلى نص
+    }
+);
 
         // إنشاء إشعار لمقدم الخدمة
         await sendNotification(

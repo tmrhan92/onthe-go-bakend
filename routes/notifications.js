@@ -147,7 +147,7 @@ router.get('/:userId', async (req, res) => {
       status: notification.status,
       createdAt: notification.createdAt,
       bookingDetails: notification.bookingId,
-      serviceDetails: notification.bookingId?.serviceId,
+      serviceDetails: notification.bookingId?.serviceId, // تفاصيل الخدمة
     }));
 
     res.status(200).json(formattedNotifications);
@@ -156,7 +156,6 @@ router.get('/:userId', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
-
 
 
 // Update notification status

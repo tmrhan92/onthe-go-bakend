@@ -79,12 +79,18 @@ router.post('/send-notification', async (req, res) => {
 });
 
 // إنشاء حجز وإشعار
-// إنشاء حجز وإشعار
+// routes/bookings.js
 router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
 
-    // جلب تفاصيل الخدمة أولاً
+    // التحقق من وجود المستخدم أولاً
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    // التحقق من وجود الخدمة
     const service = await Service.findById(serviceId);
     if (!service) {
       return res.status(404).json({ error: 'الخدمة غير موجودة' });
@@ -94,6 +100,7 @@ router.post('/', async (req, res) => {
     const newBooking = new Booking({
       userId,
       serviceId,
+      therapistId: service.therapistId, // تأكد من وجود هذا الحقل في نموذج الخدمة
       date: new Date(date),
       time,
       status: 'pending'
@@ -101,42 +108,71 @@ router.post('/', async (req, res) => {
 
     const savedBooking = await newBooking.save();
 
-    // إنشاء الإشعار مع تفاصيل الخدمة
+    // إنشاء الإشعار
     const notification = new Notification({
       userId: userId,
       bookingId: savedBooking._id,
       message: `تم حجز خدمة ${service.name} بنجاح`,
-      serviceDetails: {
-        name: service.name,
-        price: service.price,
-        description: service.description
-      },
       status: 'pending',
       createdAt: new Date()
     });
 
     await notification.save();
 
-    // إرسال إشعار Firebase مع تفاصيل الخدمة
-    const message = {
-      notification: {
-        title: 'حجز جديد',
-        body: `تم حجز خدمة ${service.name} بنجاح`,
-      },
-      data: {
-        bookingId: savedBooking._id.toString(),
-        userId: userId,
-        type: 'new_booking',
-        serviceName: service.name,
-        servicePrice: service.price.toString(),
-        serviceDescription: service.description || '',
-      },
-      token: user.fcmToken
-    };
+    // إرسال إشعار Firebase إلى المستخدم
+    if (user.fcmToken) {
+      const message = {
+        notification: {
+          title: 'حجز جديد',
+          body: `تم حجز خدمة ${service.name} بنجاح`,
+        },
+        data: {
+          bookingId: savedBooking._id.toString(),
+          userId: userId,
+          type: 'new_booking',
+          serviceName: service.name,
+          servicePrice: service.price.toString(),
+          serviceDescription: service.description || '',
+        },
+        token: user.fcmToken
+      };
 
-    await admin.messaging().send(message);
+      try {
+        await admin.messaging().send(message);
+      } catch (error) {
+        console.error('Error sending Firebase notification to user:', error);
+      }
+    }
+
+    // إرسال إشعار إلى مقدم الخدمة
+    if (service.therapistId) {
+      const therapist = await Therapist.findById(service.therapistId);
+      if (therapist && therapist.fcmToken) {
+        const therapistMessage = {
+          notification: {
+            title: 'طلب حجز جديد',
+            body: `لديك طلب حجز جديد من ${user.name}`,
+          },
+          data: {
+            bookingId: savedBooking._id.toString(),
+            userId: userId,
+            type: 'new_booking_request',
+            userName: user.name,
+            serviceName: service.name,
+          },
+          token: therapist.fcmToken
+        };
+
+        try {
+          await admin.messaging().send(therapistMessage);
+        } catch (error) {
+          console.error('Error sending Firebase notification to therapist:', error);
+        }
+      }
+    }
 
     res.status(201).json({
+      success: true,
       message: 'تم إنشاء الحجز بنجاح',
       booking: savedBooking,
       notification: notification
@@ -144,10 +180,13 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('Error creating booking:', error);
-    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: 'حدث خطأ في النظام', 
+      details: error.message 
+    });
   }
 });
-
 
 // الحصول على إشعارات مستخدم معين
 router.get('/:userId', async (req, res) => {

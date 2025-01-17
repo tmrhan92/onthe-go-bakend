@@ -109,7 +109,7 @@ router.post('/', async (req, res) => {
     const savedBooking = await newBooking.save();
 
     // إنشاء الإشعار
-    const notification = new Notification({
+  const notification = new Notification({
   userId: userId,
   bookingId: savedBooking._id,
   message: `تم حجز خدمة ${service.name} بنجاح`,
@@ -120,6 +120,7 @@ router.post('/', async (req, res) => {
   servicePrice: service.price, // إضافة سعر الخدمة
   serviceDescription: service.description || '', // إضافة وصف الخدمة
 });
+
 
 
     await notification.save();

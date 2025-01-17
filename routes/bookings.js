@@ -110,12 +110,17 @@ router.post('/', async (req, res) => {
 
     // إنشاء الإشعار
     const notification = new Notification({
-      userId: userId,
-      bookingId: savedBooking._id,
-      message: `تم حجز خدمة ${service.name} بنجاح`,
-      status: 'pending',
-      createdAt: new Date()
-    });
+  userId: userId,
+  bookingId: savedBooking._id,
+  message: `تم حجز خدمة ${service.name} بنجاح`,
+  status: 'pending',
+  createdAt: new Date(),
+  serviceId: service._id, // إضافة معرف الخدمة
+  serviceName: service.name, // إضافة اسم الخدمة
+  servicePrice: service.price, // إضافة سعر الخدمة
+  serviceDescription: service.description || '', // إضافة وصف الخدمة
+});
+
 
     await notification.save();
 

@@ -84,13 +84,13 @@ router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
 
-    // التحقق من وجود المستخدم
+    // جلب بيانات المستخدم (طالب الخدمة)
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
-    // التحقق من وجود الخدمة
+    // جلب بيانات الخدمة
     const service = await Service.findById(serviceId);
     if (!service) {
       return res.status(404).json({ error: 'الخدمة غير موجودة' });
@@ -100,7 +100,7 @@ router.post('/', async (req, res) => {
     const newBooking = new Booking({
       userId,
       serviceId,
-      therapistId: service.therapistId, // إضافة therapistId
+      therapistId: service.therapistId,
       date: new Date(date),
       time,
       status: 'pending'
@@ -108,48 +108,20 @@ router.post('/', async (req, res) => {
 
     const savedBooking = await newBooking.save();
 
-    // إنشاء الإشعار
+    // إنشاء الإشعار مع إضافة رقم الهاتف
     const notification = new Notification({
       userId,
-      therapistId: service.therapistId, // إضافة therapistId
+      therapistId: service.therapistId,
       bookingId: savedBooking._id,
       message: `تم طلب خدمة جديدة: ${service.name}`,
       status: 'pending',
       serviceName: service.name,
       servicePrice: service.price,
-      serviceDescription: service.description || ''
+      serviceDescription: service.description || '',
+      userPhone: user.phone, // إضافة رقم هاتف طالب الخدمة
     });
 
     await notification.save();
-
-    // إرسال إشعار Firebase إلى مقدم الخدمة
-    const therapist = await User.findById(service.therapistId);
-    if (therapist && therapist.fcmToken) {
-      const message = {
-        notification: {
-          title: 'طلب خدمة جديدة',
-          body: `لديك طلب خدمة جديدة من ${user.name}`,
-        },
-        data: {
-          bookingId: savedBooking._id.toString(),
-          userId: userId.toString(),
-          userName: user.name,
-          userPhone: user.phone, // إرسال رقم هاتف طالب الخدمة
-          serviceName: service.name,
-          servicePrice: service.price.toString(),
-          serviceDescription: service.description || '',
-          type: 'new_booking_request'
-        },
-        token: therapist.fcmToken
-      };
-
-      try {
-        await admin.messaging().send(message);
-        console.log('Notification sent to therapist successfully');
-      } catch (error) {
-        console.error('Error sending Firebase notification to therapist:', error);
-      }
-    }
 
     res.status(201).json({
       message: 'تم إنشاء الحجز بنجاح',

@@ -188,12 +188,11 @@ router.get('/therapist/:therapistId', async (req, res) => {
 });
 
 // تحديث حالة الإشعار
+// تحديث حالة الإشعار
 router.post('/:notificationId/status', async (req, res) => {
   try {
     const { notificationId } = req.params;
     const { status } = req.body;
-    
-    console.log(`Updating notification ${notificationId} to status: ${status}`);
 
     // التحقق من صحة الحالة
     const validStatuses = ['pending', 'accepted', 'rejected'];
@@ -240,51 +239,11 @@ router.post('/:notificationId/status', async (req, res) => {
       );
     }
 
-    // جلب معلومات المستخدم لإرسال الإشعار
-    const user = notification.bookingId?.userId;
-    if (!user?.fcmToken) {
-      console.log('User FCM token not found, skipping notification');
-      return res.json({
-        message: 'تم تحديث الحالة بنجاح',
-        notification
-      });
-    }
-
-    // تحضير بيانات الإشعار
-    const serviceDetails = notification.bookingId?.serviceId || {};
-    const notificationMessage = {
-      notification: {
-        title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
-        body: status === 'accepted' 
-          ? `تم قبول طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`
-          : `تم رفض طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`,
-      },
-      data: {
-        bookingId: notification.bookingId._id.toString(),
-        userId: user._id.toString(),
-        type: 'booking_status_update',
-        status: status,
-        serviceName: serviceDetails.name || '',
-        servicePrice: serviceDetails.price?.toString() || '0',
-        serviceDescription: serviceDetails.description || '',
-        userPhone: status === 'accepted' ? (user.phone || '') : '', // إضافة رقم الهاتف فقط عند القبول
-      },
-      token: user.fcmToken
-    };
-
-    // إرسال الإشعار
-    try {
-      await admin.messaging().send(notificationMessage);
-      console.log('Firebase notification sent successfully');
-    } catch (error) {
-      console.error('Error sending Firebase notification:', error);
-    }
-
     res.json({
       message: 'تم تحديث الحالة بنجاح',
       notification: {
         ...notification.toObject(),
-        userPhone: status === 'accepted' ? user.phone : undefined // إضافة رقم الهاتف للرد
+        userPhone: status === 'accepted' ? notification.bookingId.userId.phone : undefined
       }
     });
 
@@ -296,6 +255,7 @@ router.post('/:notificationId/status', async (req, res) => {
     });
   }
 });
+
 
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {

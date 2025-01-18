@@ -1,5 +1,3 @@
-const mongoose = require('mongoose');
-
 const NotificationSchema = new mongoose.Schema({
   userId: {
     type: String,
@@ -37,10 +35,14 @@ const NotificationSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  notificationType: { // إضافة نوع الإشعار
+  notificationType: {
     type: String,
     enum: ['booking', 'payment', 'other'],
     default: 'booking'
+  },
+  phone: { // إضافة حقل phone
+    type: String,
+    required: false // يمكن جعله مطلوباً إذا لزم الأمر
   },
   createdAt: {
     type: Date,

@@ -84,7 +84,7 @@ router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
 
-    // التحقق من وجود المستخدم أولاً
+    // التحقق من وجود المستخدم
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
@@ -100,7 +100,7 @@ router.post('/', async (req, res) => {
     const newBooking = new Booking({
       userId,
       serviceId,
-      therapistId: service.therapistId, // تأكد من وجود هذا الحقل في نموذج الخدمة
+      therapistId: service.therapistId, // إضافة therapistId
       date: new Date(date),
       time,
       status: 'pending'
@@ -109,76 +109,49 @@ router.post('/', async (req, res) => {
     const savedBooking = await newBooking.save();
 
     // إنشاء الإشعار
-  const notification = new Notification({
-  userId: userId,
-  bookingId: savedBooking._id,
-  message: `تم حجز خدمة ${service.name} بنجاح`,
-  status: 'pending',
-  createdAt: new Date(),
-  serviceId: service._id, // إضافة معرف الخدمة
-  serviceName: service.name, // إضافة اسم الخدمة
-  servicePrice: service.price, // إضافة سعر الخدمة
-  serviceDescription: service.description || '', // إضافة وصف الخدمة
-});
-
-
+    const notification = new Notification({
+      userId,
+      therapistId: service.therapistId, // إضافة therapistId
+      bookingId: savedBooking._id,
+      message: `تم طلب خدمة جديدة: ${service.name}`,
+      status: 'pending',
+      serviceName: service.name,
+      servicePrice: service.price,
+      serviceDescription: service.description || ''
+    });
 
     await notification.save();
 
-    // إرسال إشعار Firebase إلى المستخدم
-    if (user.fcmToken) {
+    // إرسال إشعار Firebase إلى مقدم الخدمة
+    const therapist = await User.findById(service.therapistId);
+    if (therapist && therapist.fcmToken) {
       const message = {
         notification: {
-          title: 'حجز جديد',
-          body: `تم حجز خدمة ${service.name} بنجاح`,
+          title: 'طلب خدمة جديدة',
+          body: `لديك طلب خدمة جديدة من ${user.name}`,
         },
         data: {
           bookingId: savedBooking._id.toString(),
-          userId: userId,
-          type: 'new_booking',
+          userId: userId.toString(),
+          userName: user.name,
+          userPhone: user.phone, // إرسال رقم هاتف طالب الخدمة
           serviceName: service.name,
           servicePrice: service.price.toString(),
           serviceDescription: service.description || '',
+          type: 'new_booking_request'
         },
-        token: user.fcmToken
+        token: therapist.fcmToken
       };
 
       try {
         await admin.messaging().send(message);
+        console.log('Notification sent to therapist successfully');
       } catch (error) {
-        console.error('Error sending Firebase notification to user:', error);
-      }
-    }
-
-    // إرسال إشعار إلى مقدم الخدمة
-    if (service.therapistId) {
-      const therapist = await Therapist.findById(service.therapistId);
-      if (therapist && therapist.fcmToken) {
-        const therapistMessage = {
-          notification: {
-            title: 'طلب حجز جديد',
-            body: `لديك طلب حجز جديد من ${user.name}`,
-          },
-          data: {
-            bookingId: savedBooking._id.toString(),
-            userId: userId,
-            type: 'new_booking_request',
-            userName: user.name,
-            serviceName: service.name,
-          },
-          token: therapist.fcmToken
-        };
-
-        try {
-          await admin.messaging().send(therapistMessage);
-        } catch (error) {
-          console.error('Error sending Firebase notification to therapist:', error);
-        }
+        console.error('Error sending Firebase notification to therapist:', error);
       }
     }
 
     res.status(201).json({
-      success: true,
       message: 'تم إنشاء الحجز بنجاح',
       booking: savedBooking,
       notification: notification
@@ -187,13 +160,11 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error creating booking:', error);
     res.status(500).json({ 
-      success: false, 
       error: 'حدث خطأ في النظام', 
       details: error.message 
     });
   }
 });
-
 // الحصول على إشعارات مستخدم معين
 router.get('/:userId', async (req, res) => {
   try {

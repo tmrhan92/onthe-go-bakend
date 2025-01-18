@@ -214,32 +214,35 @@ router.post('/:notificationId/status', async (req, res) => {
 
     // إرسال إشعار Firebase إلى طالب الخدمة
     const user = await User.findById(notification.userId);
-    if (user && user.fcmToken) {
-      const message = {
-        notification: {
-          title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
-          body: status === 'accepted' 
-            ? `تم قبول طلبك للخدمة: ${notification.bookingId.serviceId.name}` 
-            : `تم رفض طلبك للخدمة: ${notification.bookingId.serviceId.name}`,
-        },
-        data: {
-          bookingId: notification.bookingId._id.toString(), // تحويل ObjectId إلى نص
-          userId: notification.userId.toString(), // تحويل ObjectId إلى نص
-          type: 'booking_status_update',
-          status: status, // هذا نص بالفعل
-          serviceName: notification.bookingId.serviceId.name, // هذا نص بالفعل
-          servicePrice: notification.bookingId.serviceId.price.toString(), // تحويل الرقم إلى نص
-          serviceDescription: notification.bookingId.serviceId.description || '', // هذا نص بالفعل
-        },
-        token: user.fcmToken
-      };
+    if (!user || !user.fcmToken) {
+      console.error('User or FCM token not found');
+      return res.status(200).json({ message: 'تم تحديث الحالة بنجاح' });
+    }
 
-      try {
-        await admin.messaging().send(message);
-        console.log('Notification sent successfully');
-      } catch (error) {
-        console.error('Error sending Firebase notification:', error);
-      }
+    const message = {
+      notification: {
+        title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
+        body: status === 'accepted' 
+          ? `تم قبول طلبك للخدمة: ${notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة'}` 
+          : `تم رفض طلبك للخدمة: ${notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة'}`,
+      },
+      data: {
+        bookingId: notification.bookingId?._id?.toString() ?? '', // تحقق من وجود bookingId و _id
+        userId: notification.userId?.toString() ?? '', // تحقق من وجود userId
+        type: 'booking_status_update',
+        status: status,
+        serviceName: notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة', // تحقق من وجود serviceId و name
+        servicePrice: notification.bookingId?.serviceId?.price?.toString() ?? '0', // تحقق من وجود serviceId و price
+        serviceDescription: notification.bookingId?.serviceId?.description ?? '', // تحقق من وجود serviceId و description
+      },
+      token: user.fcmToken
+    };
+
+    try {
+      await admin.messaging().send(message);
+      console.log('Notification sent successfully');
+    } catch (error) {
+      console.error('Error sending Firebase notification:', error);
     }
 
     console.log('Successfully updated notification status');
@@ -257,6 +260,7 @@ router.post('/:notificationId/status', async (req, res) => {
     });
   }
 });
+
 
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {

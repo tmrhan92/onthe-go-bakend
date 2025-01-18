@@ -6,6 +6,11 @@ const NotificationSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  therapistId: {
+    type: String,
+    required: true,
+    index: true
+  },
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
@@ -17,13 +22,34 @@ const NotificationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'unread'], // إضافة 'unread'
+    enum: ['pending', 'accepted', 'rejected', 'unread'],
     default: 'pending'
+  },
+  serviceName: {
+    type: String,
+    required: true
+  },
+  servicePrice: {
+    type: Number,
+    required: true
+  },
+  serviceDescription: {
+    type: String,
+    default: ''
+  },
+  notificationType: { // إضافة نوع الإشعار
+    type: String,
+    enum: ['booking', 'payment', 'other'],
+    default: 'booking'
   },
   createdAt: {
     type: Date,
     default: Date.now,
     index: true
+  },
+  readAt: {
+    type: Date,
+    default: null
   }
 });
 

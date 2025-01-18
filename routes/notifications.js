@@ -192,23 +192,45 @@ router.post('/:notificationId/status', async (req, res) => {
   try {
     const { notificationId } = req.params;
     const { status } = req.body;
-
+    
     console.log(`Updating notification ${notificationId} to status: ${status}`);
 
+    // التحقق من صحة الحالة
     const validStatuses = ['pending', 'accepted', 'rejected'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'حالة غير صالحة' });
     }
 
-    const notification = await Notification.findByIdAndUpdate(
-      notificationId,
-      { status },
-      { new: true }
-    ).populate('bookingId');
+    // جلب الإشعار مع كل البيانات المرتبطة
+    const notification = await Notification.findById(notificationId)
+      .populate({
+        path: 'bookingId',
+        populate: [
+          { 
+            path: 'userId',
+            model: 'User',
+            select: 'name email phone fcmToken'
+          },
+          { 
+            path: 'serviceId',
+            model: 'Service'
+          }
+        ]
+      });
 
     if (!notification) {
       return res.status(404).json({ error: 'الإشعار غير موجود' });
     }
+
+    // تحديث حالة الإشعار
+    notification.status = status;
+    
+    // إضافة رقم الهاتف عند قبول الطلب
+    if (status === 'accepted' && notification.bookingId?.userId?.phone) {
+      notification.userPhone = notification.bookingId.userId.phone;
+    }
+
+    await notification.save();
 
     // تحديث حالة الحجز المرتبط
     if (notification.bookingId) {
@@ -218,44 +240,52 @@ router.post('/:notificationId/status', async (req, res) => {
       );
     }
 
-    // إرسال إشعار Firebase إلى طالب الخدمة
-    const user = await User.findById(notification.userId);
-    if (!user || !user.fcmToken) {
-      console.error('User or FCM token not found');
-      return res.status(200).json({ message: 'تم تحديث الحالة بنجاح' });
+    // جلب معلومات المستخدم لإرسال الإشعار
+    const user = notification.bookingId?.userId;
+    if (!user?.fcmToken) {
+      console.log('User FCM token not found, skipping notification');
+      return res.json({
+        message: 'تم تحديث الحالة بنجاح',
+        notification
+      });
     }
 
-    const message = {
+    // تحضير بيانات الإشعار
+    const serviceDetails = notification.bookingId?.serviceId || {};
+    const notificationMessage = {
       notification: {
         title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
         body: status === 'accepted' 
-          ? `تم قبول طلبك للخدمة: ${notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة'}` 
-          : `تم رفض طلبك للخدمة: ${notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة'}`,
+          ? `تم قبول طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`
+          : `تم رفض طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`,
       },
       data: {
-        bookingId: notification.bookingId?._id?.toString() ?? '', // تحقق من وجود bookingId و _id
-        userId: notification.userId?.toString() ?? '', // تحقق من وجود userId
+        bookingId: notification.bookingId._id.toString(),
+        userId: user._id.toString(),
         type: 'booking_status_update',
         status: status,
-        serviceName: notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة', // تحقق من وجود serviceId و name
-        servicePrice: notification.bookingId?.serviceId?.price?.toString() ?? '0', // تحقق من وجود serviceId و price
-        serviceDescription: notification.bookingId?.serviceId?.description ?? '', // تحقق من وجود serviceId و description
+        serviceName: serviceDetails.name || '',
+        servicePrice: serviceDetails.price?.toString() || '0',
+        serviceDescription: serviceDetails.description || '',
+        userPhone: status === 'accepted' ? (user.phone || '') : '', // إضافة رقم الهاتف فقط عند القبول
       },
       token: user.fcmToken
     };
 
+    // إرسال الإشعار
     try {
-      await admin.messaging().send(message);
-      console.log('Notification sent successfully');
+      await admin.messaging().send(notificationMessage);
+      console.log('Firebase notification sent successfully');
     } catch (error) {
       console.error('Error sending Firebase notification:', error);
     }
 
-    console.log('Successfully updated notification status');
-
     res.json({
       message: 'تم تحديث الحالة بنجاح',
-      notification
+      notification: {
+        ...notification.toObject(),
+        userPhone: status === 'accepted' ? user.phone : undefined // إضافة رقم الهاتف للرد
+      }
     });
 
   } catch (error) {

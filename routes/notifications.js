@@ -212,6 +212,34 @@ router.post('/:notificationId/status', async (req, res) => {
       );
     }
 
+    // إرسال إشعار Firebase إلى طالب الخدمة
+    const user = await User.findById(notification.userId);
+    if (user && user.fcmToken) {
+      const message = {
+        notification: {
+          title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
+          body: status === 'accepted' 
+            ? `تم قبول طلبك للخدمة: ${notification.bookingId.serviceId.name}` 
+            : `تم رفض طلبك للخدمة: ${notification.bookingId.serviceId.name}`,
+        },
+        data: {
+          bookingId: notification.bookingId._id.toString(),
+          userId: notification.userId,
+          type: 'booking_status_update',
+          status: status,
+          serviceName: notification.bookingId.serviceId.name,
+        },
+        token: user.fcmToken
+      };
+
+      try {
+        await admin.messaging().send(message);
+        console.log('Notification sent successfully');
+      } catch (error) {
+        console.error('Error sending Firebase notification:', error);
+      }
+    }
+
     console.log('Successfully updated notification status');
 
     res.json({
@@ -227,7 +255,6 @@ router.post('/:notificationId/status', async (req, res) => {
     });
   }
 });
-
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {
   try {

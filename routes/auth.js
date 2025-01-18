@@ -35,65 +35,39 @@ router.post('/update-fcm-token', async (req, res) => {
 });
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
-    const { email, password, name, role } = req.body;
-    
-    // طباعة البيانات للتحقق
-    console.log('Registration attempt:', {
-        email,
-        name,
-        role
+  const { email, password, name, role, phone } = req.body; // إضافة phone
+
+  if (!email || !password || !name || !role || !phone) { // التحقق من وجود phone
+    return res.status(400).send("جميع الحقول مطلوبة، بما في ذلك رقم الهاتف.");
+  }
+
+  try {
+    // التحقق من وجود المستخدم
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = generateUserId(name, role);
+
+    const newUser = new User({
+      _id: userId,
+      userId,
+      email,
+      password: hashedPassword,
+      name,
+      role,
+      phone // إضافة phone
     });
 
-    if (!email || !password || !name || !role) {
-        return res.status(400).send("جميع الحقول مطلوبة.");
-    }
-
-    // تحويل البريد الإلكتروني إلى أحرف صغيرة وإزالة المسافات الزائدة
-    const normalizedEmail = email.toLowerCase().trim();
-
-    if (!['طالب_خدمة', 'مقدم_خدمة'].includes(role)) {
-        return res.status(400).send("الدور غير صالح.");
-    }
-
-    try {
-        // التحقق من وجود المستخدم
-        const existingUser = await User.findOne({ email: normalizedEmail });
-        if (existingUser) {
-            return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const userId = generateUserId(name, role);
-        
-        if (!userId) {
-            return res.status(400).send("فشل في توليد userId.");
-        }
-
-        const newUser = new User({
-            _id: userId,
-            userId,
-            email: normalizedEmail,
-            password: hashedPassword,
-            name,
-            role
-        });
-
-        // طباعة كائن المستخدم قبل الحفظ
-        console.log('User to be saved:', newUser);
-
-        const savedUser = await newUser.save();
-        console.log('Saved user:', savedUser);
-
-        res.status(201).send("تم التسجيل بنجاح");
-    } catch (error) {
-        console.error("Error during registration:", error);
-        if (error.code === 11000) {
-            return res.status(400).send("البريد الإلكتروني أو معرف المستخدم مستخدم بالفعل.");
-        }
-        res.status(500).send("خطأ في التسجيل");
-    }
+    const savedUser = await newUser.save();
+    res.status(201).send("تم التسجيل بنجاح");
+  } catch (error) {
+    console.error("Error during registration:", error);
+    res.status(500).send("خطأ في التسجيل");
+  }
 });
-
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;

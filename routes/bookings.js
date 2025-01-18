@@ -119,6 +119,8 @@ router.post('/', async (req, res) => {
   serviceName: service.name, // إضافة اسم الخدمة
   servicePrice: service.price, // إضافة سعر الخدمة
   serviceDescription: service.description || '', // إضافة وصف الخدمة
+  userPhone: user.phone // إضافة رقم الهاتف
+
 });
 
 

@@ -176,7 +176,8 @@ router.get('/therapist/:therapistId', async (req, res) => {
         time: notification.bookingId.time,
         status: notification.bookingId.status,
         user: notification.bookingId.userId,
-        service: notification.bookingId.serviceId
+        service: notification.bookingId.serviceId,
+        userPhone: notification.userPhone // تأكد من إضافة هذا الحقل
       }
     }));
 

@@ -223,11 +223,13 @@ router.post('/:notificationId/status', async (req, res) => {
             : `تم رفض طلبك للخدمة: ${notification.bookingId.serviceId.name}`,
         },
         data: {
-          bookingId: notification.bookingId._id.toString(),
-          userId: notification.userId,
+          bookingId: notification.bookingId._id.toString(), // تحويل ObjectId إلى نص
+          userId: notification.userId.toString(), // تحويل ObjectId إلى نص
           type: 'booking_status_update',
-          status: status,
-          serviceName: notification.bookingId.serviceId.name,
+          status: status, // هذا نص بالفعل
+          serviceName: notification.bookingId.serviceId.name, // هذا نص بالفعل
+          servicePrice: notification.bookingId.serviceId.price.toString(), // تحويل الرقم إلى نص
+          serviceDescription: notification.bookingId.serviceId.description || '', // هذا نص بالفعل
         },
         token: user.fcmToken
       };
@@ -255,6 +257,7 @@ router.post('/:notificationId/status', async (req, res) => {
     });
   }
 });
+
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {
   try {

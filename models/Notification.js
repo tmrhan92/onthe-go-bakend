@@ -8,7 +8,7 @@ const NotificationSchema = new mongoose.Schema({
   },
   therapistId: {
     type: String,
-    required: true,
+    required: false,
     index: true
   },
   bookingId: {

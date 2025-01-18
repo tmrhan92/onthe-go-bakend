@@ -139,6 +139,8 @@ router.post('/', async (req, res) => {
           serviceName: service.name,
           servicePrice: service.price.toString(),
           serviceDescription: service.description || '',
+          userPhone: user.phone, // إضافة رقم هاتف طالب الخدمة
+
         },
         token: user.fcmToken
       };

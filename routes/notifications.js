@@ -34,12 +34,18 @@ router.post('/', async (req, res) => {
     const savedBooking = await newBooking.save();
 
     // إنشاء الإشعار
+    // إنشاء الإشعار مع إضافة رقم الهاتف
     const notification = new Notification({
       userId: userId,
       bookingId: savedBooking._id,
-      message: `تم حجز الخدمة بنجاح: ${service.name}`,
+      message: `تم حجز خدمة ${service.name} بنجاح`,
       status: 'pending',
-      createdAt: new Date()
+      createdAt: new Date(),
+      serviceId: service._id,
+      serviceName: service.name,
+      servicePrice: service.price,
+      serviceDescription: service.description || '',
+      userPhone: user.phone // إضافة رقم الهاتف
     });
 
     await notification.save();

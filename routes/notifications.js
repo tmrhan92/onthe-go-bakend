@@ -194,15 +194,26 @@ router.post('/:notificationId/status', async (req, res) => {
       return res.status(400).json({ error: 'حالة غير صالحة' });
     }
 
-    const notification = await Notification.findByIdAndUpdate(
-      notificationId,
-      { status },
-      { new: true }
-    ).populate('bookingId');
+    // جلب الإشعار وتحميل تفاصيل الحجز والخدمة
+    const notification = await Notification.findById(notificationId)
+      .populate({
+        path: 'bookingId',
+        populate: {
+          path: 'serviceId',
+          model: 'Service'
+        }
+      });
 
     if (!notification) {
       return res.status(404).json({ error: 'الإشعار غير موجود' });
     }
+
+    // التحقق من وجود الحجز والخدمة
+    if (!notification.bookingId || !notification.bookingId.serviceId) {
+      return res.status(404).json({ error: 'الحجز أو الخدمة غير موجودة' });
+    }
+
+    const serviceName = notification.bookingId.serviceId.name || 'خدمة غير معروفة';
 
     // تحديث حالة الحجز المرتبط
     if (notification.bookingId) {
@@ -223,17 +234,17 @@ router.post('/:notificationId/status', async (req, res) => {
       notification: {
         title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
         body: status === 'accepted' 
-          ? `تم قبول طلبك للخدمة: ${notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة'}` 
-          : `تم رفض طلبك للخدمة: ${notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة'}`,
+          ? `تم قبول طلبك للخدمة: ${serviceName}` 
+          : `تم رفض طلبك للخدمة: ${serviceName}`,
       },
       data: {
-        bookingId: notification.bookingId?._id?.toString() ?? '', // تحقق من وجود bookingId و _id
-        userId: notification.userId?.toString() ?? '', // تحقق من وجود userId
+        bookingId: notification.bookingId._id.toString(),
+        userId: notification.userId.toString(),
         type: 'booking_status_update',
         status: status,
-        serviceName: notification.bookingId?.serviceId?.name ?? 'خدمة غير معروفة', // تحقق من وجود serviceId و name
-        servicePrice: notification.bookingId?.serviceId?.price?.toString() ?? '0', // تحقق من وجود serviceId و price
-        serviceDescription: notification.bookingId?.serviceId?.description ?? '', // تحقق من وجود serviceId و description
+        serviceName: serviceName,
+        servicePrice: notification.bookingId.serviceId.price?.toString() ?? '0',
+        serviceDescription: notification.bookingId.serviceId.description || '',
       },
       token: user.fcmToken
     };
@@ -260,7 +271,6 @@ router.post('/:notificationId/status', async (req, res) => {
     });
   }
 });
-
 
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {

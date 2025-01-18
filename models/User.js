@@ -33,6 +33,11 @@ unique: true // تأكد من أنه فريد
         required: [true, 'الاسم مطلوب'],
         trim: true
     },
+
+phone: { // إضافة حقل رقم الهاتف
+    type: String,
+    required: true
+  },
     role: {
         type: String,
         enum: ['طالب_خدمة', 'مقدم_خدمة'],

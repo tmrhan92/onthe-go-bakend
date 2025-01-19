@@ -99,39 +99,6 @@ router.post('/', async (req, res) => {
       console.warn('لا يوجد FCM Token للمستخدم:', userId);
     }
 
-    // إرسال إشعار Firebase لمقدم الخدمة
-    const therapist = await Therapist.findById(service.therapistId);
-    if (therapist?.fcmToken) {
-      console.log('FCM Token موجود لمقدم الخدمة:', therapist.fcmToken);
-      try {
-        const message = {
-          notification: {
-            title: 'حجز جديد',
-            body: `تم حجز خدمتك: ${service.name}`,
-          },
-          data: {
-            bookingId: savedBooking._id.toString(),
-            userId: userId,
-            type: 'new_booking',
-            userPhone: user.phone
-          },
-          token: therapist.fcmToken
-        };
-
-        const response = await admin.messaging().send(message);
-        console.log('تم إرسال إشعار Firebase لمقدم الخدمة بنجاح:', response);
-      } catch (error) {
-        console.error('خطأ في إرسال إشعار Firebase لمقدم الخدمة:', error);
-        console.error('تفاصيل الرسالة:', {
-          therapistId: service.therapistId,
-          fcmToken: therapist.fcmToken,
-          serviceName: service.name
-        });
-      }
-    } else {
-      console.warn('لا يوجد FCM Token لمقدم الخدمة:', service.therapistId);
-    }
-
     res.status(201).json({
       message: 'تم إنشاء الحجز بنجاح',
       booking: savedBooking,
@@ -143,6 +110,7 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
+
 // جلب الإشعارات للمستخدم
 router.get('/:userId', async (req, res) => {
   try {

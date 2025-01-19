@@ -37,14 +37,9 @@ const NotificationSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  notificationType: {
+  userPhone: { // إضافة حقل رقم الهاتف
     type: String,
-    enum: ['booking', 'payment', 'other'],
-    default: 'booking'
-  },
-  phone: { // إضافة حقل phone
-    type: String,
-    required: false // يمكن جعله مطلوباً إذا لزم الأمر
+    required: false
   },
   createdAt: {
     type: Date,

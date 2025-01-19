@@ -192,16 +192,14 @@ router.post('/:notificationId/status', async (req, res) => {
   try {
     const { notificationId } = req.params;
     const { status } = req.body;
-    
+
     console.log(`Updating notification ${notificationId} to status: ${status}`);
 
-    // التحقق من صحة الحالة
     const validStatuses = ['pending', 'accepted', 'rejected'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'حالة غير صالحة' });
     }
 
-    // جلب الإشعار مع كل البيانات المرتبطة
     const notification = await Notification.findById(notificationId)
       .populate({
         path: 'bookingId',

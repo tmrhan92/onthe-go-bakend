@@ -80,6 +80,7 @@ router.post('/send-notification', async (req, res) => {
 
 // إنشاء حجز وإشعار
 // routes/bookings.js
+// إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
@@ -96,90 +97,65 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'الخدمة غير موجودة' });
     }
 
+    // التحقق من وجود رقم الهاتف
+    if (!user.phone) {
+      return res.status(400).json({ error: 'رقم الهاتف مطلوب لإتمام الحجز' });
+    }
+
     // إنشاء الحجز
     const newBooking = new Booking({
       userId,
       serviceId,
-      therapistId: service.therapistId, // تأكد من وجود هذا الحقل في نموذج الخدمة
+      therapistId: service.therapistId,
       date: new Date(date),
       time,
-      userPhone: user.phone, // إضافة رقم هاتف المستخدم
+      userPhone: user.phone, // إضافة رقم الهاتف للحجز
       status: 'pending'
     });
 
     const savedBooking = await newBooking.save();
 
-    // إنشاء الإشعار
+    // إنشاء الإشعار مع رقم الهاتف
     const notification = new Notification({
       userId: userId,
       bookingId: savedBooking._id,
       message: `تم حجز خدمة ${service.name} بنجاح`,
       status: 'pending',
       createdAt: new Date(),
-      serviceId: service._id, // إضافة معرف الخدمة
-      serviceName: service.name, // إضافة اسم الخدمة
-      servicePrice: service.price, // إضافة سعر الخدمة
-      serviceDescription: service.description || '', // إضافة وصف الخدمة
-      userPhone: user.phone // إضافة رقم الهاتف
+      serviceId: service._id,
+      serviceName: service.name,
+      servicePrice: service.price,
+      serviceDescription: service.description || '',
+      userPhone: user.phone // إضافة رقم الهاتف للإشعار
     });
 
     await notification.save();
 
-    // إرسال إشعار Firebase إلى المستخدم
+    // إرسال إشعار Firebase
     if (user.fcmToken) {
       const message = {
         notification: {
           title: 'حجز جديد',
-          body: `تم حجز خدمة ${service.name} بنجاح`,
+          body: `تم حجز الخدمة بنجاح: ${service.name}`,
         },
         data: {
           bookingId: savedBooking._id.toString(),
           userId: userId,
           type: 'new_booking',
-          serviceName: service.name,
-          servicePrice: service.price.toString(),
-          serviceDescription: service.description || '',
-          userPhone: user.phone, // إضافة رقم هاتف طالب الخدمة
+          userPhone: user.phone // إضافة رقم الهاتف للإشعار
         },
         token: user.fcmToken
       };
 
       try {
         await admin.messaging().send(message);
+        console.log('تم إرسال الإشعار بنجاح');
       } catch (error) {
-        console.error('Error sending Firebase notification to user:', error);
-      }
-    }
-
-    // إرسال إشعار إلى مقدم الخدمة
-    if (service.therapistId) {
-      const therapist = await Therapist.findById(service.therapistId);
-      if (therapist && therapist.fcmToken) {
-        const therapistMessage = {
-          notification: {
-            title: 'طلب حجز جديد',
-            body: `لديك طلب حجز جديد من ${user.name}`,
-          },
-          data: {
-            bookingId: savedBooking._id.toString(),
-            userId: userId,
-            type: 'new_booking_request',
-            userName: user.name,
-            serviceName: service.name,
-          },
-          token: therapist.fcmToken
-        };
-
-        try {
-          await admin.messaging().send(therapistMessage);
-        } catch (error) {
-          console.error('Error sending Firebase notification to therapist:', error);
-        }
+        console.error('خطأ في إرسال إشعار Firebase:', error);
       }
     }
 
     res.status(201).json({
-      success: true,
       message: 'تم إنشاء الحجز بنجاح',
       booking: savedBooking,
       notification: notification
@@ -187,11 +163,7 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('Error creating booking:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'حدث خطأ في النظام', 
-      details: error.message 
-    });
+    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
 

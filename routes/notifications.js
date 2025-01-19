@@ -157,7 +157,7 @@ router.post('/:notificationId/status', async (req, res) => {
     const { notificationId } = req.params;
     const { status } = req.body;
 
-    console.log(`تحديث الإشعار ${notificationId} إلى الحالة: ${status}`);
+    console.log(`Updating notification ${notificationId} to status: ${status}`);
 
     const validStatuses = ['pending', 'accepted', 'rejected'];
     if (!validStatuses.includes(status)) {
@@ -186,10 +186,11 @@ router.post('/:notificationId/status', async (req, res) => {
 
     // تحديث حالة الإشعار
     notification.status = status;
-    
+
+    // إضافة/تحديث رقم الهاتف عند قبول الطلب
     if (status === 'accepted' && notification.bookingId?.userId?.phone) {
       notification.userPhone = notification.bookingId.userId.phone;
-      console.log('تم تحديث رقم هاتف المستخدم:', notification.userPhone);
+      console.log('User phone updated:', notification.userPhone);
     }
 
     await notification.save();
@@ -200,55 +201,38 @@ router.post('/:notificationId/status', async (req, res) => {
         notification.bookingId._id,
         { status }
       );
-      console.log('تم تحديث حالة الحجز');
     }
 
     // إرسال إشعار للمستخدم
     const user = notification.bookingId?.userId;
-    console.log('معلومات المستخدم:', {
-      userId: user?._id,
-      fcmToken: user?.fcmToken,
-      phone: user?.phone
-    });
-
     if (user?.fcmToken) {
       const serviceDetails = notification.bookingId?.serviceId || {};
-      
-      try {
-        const notificationMessage = {
-          notification: {
-            title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
-            body: `${status === 'accepted' ? 'تم قبول' : 'تم رفض'} طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`,
-          },
-          data: {
-            bookingId: notification.bookingId._id.toString(),
-            userId: user._id.toString(),
-            type: 'booking_status_update',
-            status: status,
-            serviceName: serviceDetails.name || '',
-            servicePrice: serviceDetails.price?.toString() || '0',
-            serviceDescription: serviceDetails.description || '',
-            userPhone: status === 'accepted' ? (user.phone || '') : ''
-          },
-          token: user.fcmToken
-        };
+      const notificationMessage = {
+        notification: {
+          title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
+          body: `${status === 'accepted' ? 'تم قبول' : 'تم رفض'} طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`,
+        },
+        data: {
+          bookingId: notification.bookingId._id.toString(),
+          userId: user._id.toString(),
+          type: 'booking_status_update',
+          status: status,
+          serviceName: serviceDetails.name || '',
+          servicePrice: serviceDetails.price?.toString() || '0',
+          serviceDescription: serviceDetails.description || '',
+          userPhone: status === 'accepted' ? (user.phone || '') : ''
+        },
+        token: user.fcmToken
+      };
 
-        console.log('جاري إرسال إشعار Firebase:', notificationMessage);
-        const response = await admin.messaging().send(notificationMessage);
-        console.log('تم إرسال إشعار Firebase بنجاح:', response);
+      try {
+        await admin.messaging().send(notificationMessage);
+        console.log('Firebase notification sent successfully');
       } catch (error) {
-        console.error('خطأ في إرسال إشعار Firebase:', error);
-        console.error('تفاصيل الرسالة المفشلة:', {
-          userId: user._id,
-          fcmToken: user.fcmToken,
-          status: status
-        });
+        console.error('Error sending Firebase notification:', error);
       }
-    } else {
-      console.warn('لا يوجد FCM token للمستخدم:', user?._id);
     }
 
-    // إرجاع الاستجابة
     res.json({
       message: 'تم تحديث الحالة بنجاح',
       notification: {

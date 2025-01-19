@@ -16,7 +16,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
 
-    // التحقق من وجود الخدمة والمستخدم
+    // جلب معلومات المستخدم والخدمة
     const [service, user] = await Promise.all([
       Service.findById(serviceId),
       User.findById(userId)
@@ -30,13 +30,18 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
+    if (!user.phone) {
+      return res.status(400).json({ error: 'رقم الهاتف مطلوب لإتمام الحجز' });
+    }
+
     // إنشاء الحجز
     const newBooking = new Booking({
       userId,
       serviceId,
       date: new Date(date),
       time,
-      status: 'pending'
+      status: 'pending',
+      userPhone: user.phone // إضافة رقم الهاتف للحجز
     });
 
     const savedBooking = await newBooking.save();
@@ -52,12 +57,12 @@ router.post('/', async (req, res) => {
       serviceName: service.name,
       servicePrice: service.price,
       serviceDescription: service.description || '',
-      userPhone: user.phone // إضافة رقم الهاتف من بيانات المستخدم
+      userPhone: user.phone // إضافة رقم الهاتف للإشعار
     });
 
     await notification.save();
 
-    // إرسال إشعار Firebase إذا كان لدى المستخدم token
+    // إرسال إشعار Firebase
     if (user.fcmToken) {
       const message = {
         notification: {
@@ -74,10 +79,10 @@ router.post('/', async (req, res) => {
       };
 
       try {
-        const response = await admin.messaging().send(message);
-        console.log('Successfully sent notification:', response);
+        await admin.messaging().send(message);
+        console.log('تم إرسال الإشعار بنجاح');
       } catch (error) {
-        console.error('Error sending Firebase notification:', error);
+        console.error('خطأ في إرسال إشعار Firebase:', error);
       }
     }
 

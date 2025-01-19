@@ -3,12 +3,9 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
 const Service = require('../models/Service');
-const User = require('../models/User');
-const Therapist = require('../models/Therapist');
+const User = require('../models/User'); // تأكد من استيراد نموذج User
+const Therapist = require('../models/Therapist'); // تأكد من استيراد نموذج Therapist
 const admin = require('firebase-admin');
-
-// التحقق من تهيئة Firebase Admin
-console.log('Firebase Admin Initialization Status:', admin.apps.length > 0 ? 'Initialized' : 'Not Initialized');
 
 // إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
@@ -19,22 +16,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
 
-    // جلب معلومات المستخدم والخدمة
-    const [service, user] = await Promise.all([
-      Service.findById(serviceId),
-      User.findById(userId)
-    ]);
-
+    // التحقق من وجود الخدمة
+    const service = await Service.findById(serviceId);
     if (!service) {
       return res.status(404).json({ error: 'الخدمة غير موجودة' });
-    }
-
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-
-    if (!user.phone) {
-      return res.status(400).json({ error: 'رقم الهاتف مطلوب لإتمام الحجز' });
     }
 
     // إنشاء الحجز
@@ -43,14 +28,13 @@ router.post('/', async (req, res) => {
       serviceId,
       date: new Date(date),
       time,
-      status: 'pending',
-      userPhone: user.phone
+      status: 'pending'
     });
 
     const savedBooking = await newBooking.save();
-    console.log('تم إنشاء الحجز:', savedBooking);
 
     // إنشاء الإشعار
+    // إنشاء الإشعار مع إضافة رقم الهاتف
     const notification = new Notification({
       userId: userId,
       bookingId: savedBooking._id,
@@ -61,42 +45,41 @@ router.post('/', async (req, res) => {
       serviceName: service.name,
       servicePrice: service.price,
       serviceDescription: service.description || '',
-      userPhone: user.phone
+      userPhone: user.phone // إضافة رقم الهاتف
     });
 
     await notification.save();
-    console.log('تم إنشاء الإشعار:', notification);
 
-    // إرسال إشعار Firebase للحجز الجديد
-    if (user.fcmToken) {
-      console.log('FCM Token موجود للمستخدم:', user.fcmToken);
-      try {
-        const message = {
-          notification: {
-            title: 'حجز جديد',
-            body: `تم حجز الخدمة بنجاح: ${service.name}`,
-          },
-          data: {
-            bookingId: savedBooking._id.toString(),
-            userId: userId,
-            type: 'new_booking',
-            userPhone: user.phone
-          },
-          token: user.fcmToken
-        };
+    // جلب FCM Token من قاعدة البيانات
+    const user = await User.findById(userId);
+    if (!user || !user.fcmToken) {
+      console.error('لم يتم العثور على FCM Token للمستخدم');
+      return res.status(201).json({
+        message: 'تم إنشاء الحجز بنجاح',
+        booking: savedBooking,
+        notification: notification
+      });
+    }
 
-        const response = await admin.messaging().send(message);
-        console.log('تم إرسال إشعار Firebase بنجاح:', response);
-      } catch (error) {
-        console.error('خطأ في إرسال إشعار Firebase:', error);
-        console.error('تفاصيل الرسالة:', {
-          userId,
-          fcmToken: user.fcmToken,
-          serviceName: service.name
-        });
-      }
-    } else {
-      console.warn('لا يوجد FCM Token للمستخدم:', userId);
+    // إرسال إشعار Firebase
+    const message = {
+      notification: {
+        title: 'حجز جديد',
+        body: `تم حجز الخدمة بنجاح: ${service.name}`,
+      },
+      data: {
+        bookingId: savedBooking._id.toString(),
+        userId: userId,
+        type: 'new_booking'
+      },
+      token: user.fcmToken
+    };
+
+    try {
+      const response = await admin.messaging().send(message);
+      console.log('Successfully sent notification:', response);
+    } catch (error) {
+      console.error('Error sending Firebase notification:', error);
     }
 
     res.status(201).json({
@@ -121,17 +104,21 @@ router.get('/:userId', async (req, res) => {
       return res.status(400).json({ error: 'userId مطلوب' });
     }
 
+    // التحقق من وجود المستخدم
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
     const notifications = await Notification.find({ userId })
       .sort({ createdAt: -1 })
       .populate({
         path: 'bookingId',
-        populate: [
-          { path: 'serviceId', model: 'Service' },
-          { path: 'userId', model: 'User', select: 'phone name email fcmToken' }
-        ]
+        populate: {
+          path: 'serviceId',
+          model: 'Service',
+        },
       });
-
-    console.log('تم العثور على الإشعارات:', notifications.length);
 
     const formattedNotifications = notifications.map((notification) => ({
       id: notification._id,
@@ -140,8 +127,7 @@ router.get('/:userId', async (req, res) => {
       status: notification.status,
       createdAt: notification.createdAt,
       bookingDetails: notification.bookingId,
-      serviceDetails: notification.bookingId?.serviceId,
-      userPhone: notification.userPhone || notification.bookingId?.userId?.phone
+      serviceDetails: notification.bookingId?.serviceId, // تفاصيل الخدمة
     }));
 
     res.status(200).json(formattedNotifications);
@@ -151,19 +137,71 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
+// جلب الإشعارات لمقدم الخدمة
+router.get('/therapist/:therapistId', async (req, res) => {
+  try {
+    const therapistId = req.params.therapistId;
+    console.log('Fetching notifications for therapistId:', therapistId);
+
+    // التحقق من وجود مقدم الخدمة
+    const therapist = await Therapist.findById(therapistId);
+    if (!therapist) {
+      return res.status(404).json({ error: 'مقدم الخدمة غير موجود' });
+    }
+
+    // البحث عن الحجوزات المرتبطة بمقدم الخدمة
+    const bookings = await Booking.find({ therapistId }).populate('serviceId userId');
+    
+    // جلب الإشعارات المرتبطة بهذه الحجوزات
+    const notifications = await Notification.find({
+      bookingId: { $in: bookings.map(booking => booking._id) }
+    })
+    .sort({ createdAt: -1 })
+    .populate({
+      path: 'bookingId',
+      populate: [
+        { path: 'serviceId', model: 'Service' },
+        { path: 'userId', model: 'User', select: 'name email phone' }
+      ]
+    });
+
+    const formattedNotifications = notifications.map(notification => ({
+      id: notification._id,
+      message: notification.message,
+      status: notification.status,
+      createdAt: notification.createdAt,
+      bookingDetails: {
+        id: notification.bookingId._id,
+        date: notification.bookingId.date,
+        time: notification.bookingId.time,
+        status: notification.bookingId.status,
+        user: notification.bookingId.userId,
+        service: notification.bookingId.serviceId
+      }
+    }));
+
+    res.status(200).json(formattedNotifications);
+  } catch (error) {
+    console.error('Error fetching therapist notifications:', error);
+    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
+  }
+});
+
 // تحديث حالة الإشعار
 router.post('/:notificationId/status', async (req, res) => {
   try {
     const { notificationId } = req.params;
     const { status } = req.body;
-
+    
     console.log(`Updating notification ${notificationId} to status: ${status}`);
 
+    // التحقق من صحة الحالة
     const validStatuses = ['pending', 'accepted', 'rejected'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'حالة غير صالحة' });
     }
 
+    // جلب الإشعار مع كل البيانات المرتبطة
     const notification = await Notification.findById(notificationId)
       .populate({
         path: 'bookingId',
@@ -186,11 +224,10 @@ router.post('/:notificationId/status', async (req, res) => {
 
     // تحديث حالة الإشعار
     notification.status = status;
-
-    // إضافة/تحديث رقم الهاتف عند قبول الطلب
+    
+    // إضافة رقم الهاتف عند قبول الطلب
     if (status === 'accepted' && notification.bookingId?.userId?.phone) {
       notification.userPhone = notification.bookingId.userId.phone;
-      console.log('User phone updated:', notification.userPhone);
     }
 
     await notification.save();
@@ -203,98 +240,60 @@ router.post('/:notificationId/status', async (req, res) => {
       );
     }
 
-    // إرسال إشعار للمستخدم
+    // جلب معلومات المستخدم لإرسال الإشعار
     const user = notification.bookingId?.userId;
-    if (user?.fcmToken) {
-      const serviceDetails = notification.bookingId?.serviceId || {};
-      const notificationMessage = {
-        notification: {
-          title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
-          body: `${status === 'accepted' ? 'تم قبول' : 'تم رفض'} طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`,
-        },
-        data: {
-          bookingId: notification.bookingId._id.toString(),
-          userId: user._id.toString(),
-          type: 'booking_status_update',
-          status: status,
-          serviceName: serviceDetails.name || '',
-          servicePrice: serviceDetails.price?.toString() || '0',
-          serviceDescription: serviceDetails.description || '',
-          userPhone: status === 'accepted' ? (user.phone || '') : ''
-        },
-        token: user.fcmToken
-      };
+    if (!user?.fcmToken) {
+      console.log('User FCM token not found, skipping notification');
+      return res.json({
+        message: 'تم تحديث الحالة بنجاح',
+        notification
+      });
+    }
 
-      try {
-        await admin.messaging().send(notificationMessage);
-        console.log('Firebase notification sent successfully');
-      } catch (error) {
-        console.error('Error sending Firebase notification:', error);
-      }
+    // تحضير بيانات الإشعار
+    const serviceDetails = notification.bookingId?.serviceId || {};
+    const notificationMessage = {
+      notification: {
+        title: status === 'accepted' ? 'تم قبول طلبك' : 'تم رفض طلبك',
+        body: status === 'accepted' 
+          ? `تم قبول طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`
+          : `تم رفض طلبك للخدمة: ${serviceDetails.name || 'خدمة غير معروفة'}`,
+      },
+      data: {
+        bookingId: notification.bookingId._id.toString(),
+        userId: user._id.toString(),
+        type: 'booking_status_update',
+        status: status,
+        serviceName: serviceDetails.name || '',
+        servicePrice: serviceDetails.price?.toString() || '0',
+        serviceDescription: serviceDetails.description || '',
+        userPhone: status === 'accepted' ? (user.phone || '') : '', // إضافة رقم الهاتف فقط عند القبول
+      },
+      token: user.fcmToken
+    };
+
+    // إرسال الإشعار
+    try {
+      await admin.messaging().send(notificationMessage);
+      console.log('Firebase notification sent successfully');
+    } catch (error) {
+      console.error('Error sending Firebase notification:', error);
     }
 
     res.json({
       message: 'تم تحديث الحالة بنجاح',
       notification: {
         ...notification.toObject(),
-        userPhone: status === 'accepted' ? notification.userPhone : undefined
+        userPhone: status === 'accepted' ? user.phone : undefined // إضافة رقم الهاتف للرد
       }
     });
 
   } catch (error) {
     console.error('Error updating notification status:', error);
-    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
-  }
-});
-
-// جلب الإشعارات لمقدم الخدمة
-router.get('/therapist/:therapistId', async (req, res) => {
-  try {
-    const therapistId = req.params.therapistId;
-    console.log('Fetching notifications for therapistId:', therapistId);
-
-    const therapist = await Therapist.findById(therapistId);
-    if (!therapist) {
-      return res.status(404).json({ error: 'مقدم الخدمة غير موجود' });
-    }
-
-    const bookings = await Booking.find({ therapistId })
-      .populate('serviceId userId');
-    
-    const notifications = await Notification.find({
-      bookingId: { $in: bookings.map(booking => booking._id) }
-    })
-    .sort({ createdAt: -1 })
-    .populate({
-      path: 'bookingId',
-      populate: [
-        { path: 'serviceId', model: 'Service' },
-        { path: 'userId', model: 'User', select: 'name email phone fcmToken' }
-      ]
+    res.status(500).json({ 
+      error: 'حدث خطأ في النظام', 
+      details: error.message 
     });
-
-    console.log('تم العثور على إشعارات مقدم الخدمة:', notifications.length);
-
-    const formattedNotifications = notifications.map(notification => ({
-      id: notification._id,
-      message: notification.message,
-      status: notification.status,
-      createdAt: notification.createdAt,
-      bookingDetails: {
-        id: notification.bookingId._id,
-        date: notification.bookingId.date,
-        time: notification.bookingId.time,
-        status: notification.bookingId.status,
-        user: notification.bookingId.userId,
-        service: notification.bookingId.serviceId
-      },
-      userPhone: notification.userPhone || notification.bookingId?.userId?.phone
-    }));
-
-    res.status(200).json(formattedNotifications);
-  } catch (error) {
-    console.error('Error fetching therapist notifications:', error);
-    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
 
@@ -304,6 +303,7 @@ router.get('/service/:serviceId', async (req, res) => {
     const serviceId = req.params.serviceId;
     console.log('Fetching notifications for serviceId:', serviceId);
 
+    // التحقق من وجود الخدمة
     const service = await Service.findById(serviceId);
     if (!service) {
       return res.status(404).json({ message: 'الخدمة غير موجودة' });
@@ -315,13 +315,16 @@ router.get('/service/:serviceId', async (req, res) => {
       .sort({ createdAt: -1 })
       .populate({
         path: 'bookingId',
-        populate: [
-          { path: 'serviceId', model: 'Service' },
-          { path: 'userId', model: 'User', select: 'name email phone fcmToken' }
-        ]
+        populate: {
+          path: 'serviceId',
+          model: 'Service'
+        }
       });
 
-    console.log('تم العثور على إشعارات للخدمة:', notifications.length);
+    if (!notifications || notifications.length === 0) {
+      console.log('No notifications found for serviceId:', serviceId);
+      return res.status(404).json({ message: 'لا توجد إشعارات لهذه الخدمة' });
+    }
 
     const formattedNotifications = notifications.map(notification => ({
       id: notification._id,
@@ -329,10 +332,10 @@ router.get('/service/:serviceId', async (req, res) => {
       status: notification.status,
       createdAt: notification.createdAt,
       bookingDetails: notification.bookingId,
-      serviceDetails: notification.bookingId?.serviceId,
-      userPhone: notification.userPhone || notification.bookingId?.userId?.phone
+      serviceDetails: notification.bookingId?.serviceId
     }));
 
+    console.log('Notifications found:', formattedNotifications);
     res.status(200).json(formattedNotifications);
 
   } catch (error) {

@@ -6,10 +6,10 @@ const BookingSchema = new mongoose.Schema({
   therapistId: { type: String, required: true },
   date: { type: Date, required: true },
   time: { type: String, required: true },
-    phone: { // إضافة حقل phone
+userPhone: {
     type: String,
-    required: false // يمكن جعله مطلوباً إذا لزم الأمر
-  },
+    required: true
+  } 
   status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' }
 }, { timestamps: true });
 

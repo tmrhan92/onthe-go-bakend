@@ -203,7 +203,8 @@ router.get('/:userId', async (req, res) => {
       createdAt: notification.createdAt,
       serviceId: notification.bookingId?.serviceId?._id || '',
       bookingDetails: notification.bookingId,
-      serviceDetails: notification.bookingId?.serviceId
+      serviceDetails: notification.bookingId?.serviceId,
+      userPhone: notification.userPhone // إضافة userPhone هنا
     }));
 
     res.status(200).json(formattedNotifications);
@@ -225,7 +226,7 @@ router.post('/:notificationId/status', async (req, res) => {
 
     console.log(`Updating notification ${notificationId} to status: ${status}`);
 
-    const validStatuses = ['pending', 'accepted', 'rejected', 'unread']; // إضافة 'unread'
+    const validStatuses = ['pending', 'accepted', 'rejected', 'unread'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'حالة غير صالحة' });
     }
@@ -252,7 +253,10 @@ router.post('/:notificationId/status', async (req, res) => {
 
     res.json({
       message: 'تم تحديث الحالة بنجاح',
-      notification
+      notification: {
+        ...notification.toObject(),
+        userPhone: notification.userPhone // تضمين userPhone في الاستجابة
+      }
     });
 
   } catch (error) {

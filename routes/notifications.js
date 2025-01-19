@@ -282,7 +282,6 @@ router.post('/:notificationId/status', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
-
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {
   try {

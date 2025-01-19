@@ -80,24 +80,28 @@ router.post('/send-notification', async (req, res) => {
 
 // إنشاء حجز وإشعار
 // routes/bookings.js
-// إنشاء حجز وإشعار
 router.post('/', async (req, res) => {
   try {
     const { userId, serviceId, date, time } = req.body;
 
-    // التحقق من وجود المستخدم أولاً
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    if (!userId || !serviceId || !date || !time) {
+      return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
 
-    // التحقق من وجود الخدمة
-    const service = await Service.findById(serviceId);
+    // جلب معلومات المستخدم والخدمة
+    const [service, user] = await Promise.all([
+      Service.findById(serviceId),
+      User.findById(userId)
+    ]);
+
     if (!service) {
       return res.status(404).json({ error: 'الخدمة غير موجودة' });
     }
 
-    // التحقق من وجود رقم الهاتف
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
     if (!user.phone) {
       return res.status(400).json({ error: 'رقم الهاتف مطلوب لإتمام الحجز' });
     }
@@ -109,13 +113,14 @@ router.post('/', async (req, res) => {
       therapistId: service.therapistId,
       date: new Date(date),
       time,
-      userPhone: user.phone, // إضافة رقم الهاتف للحجز
-      status: 'pending'
+      status: 'pending',
+      userPhone: user.phone
     });
 
     const savedBooking = await newBooking.save();
+    console.log('تم إنشاء الحجز:', savedBooking);
 
-    // إنشاء الإشعار مع رقم الهاتف
+    // إنشاء الإشعار
     const notification = new Notification({
       userId: userId,
       bookingId: savedBooking._id,
@@ -126,33 +131,75 @@ router.post('/', async (req, res) => {
       serviceName: service.name,
       servicePrice: service.price,
       serviceDescription: service.description || '',
-      userPhone: user.phone // إضافة رقم الهاتف للإشعار
+      userPhone: user.phone
     });
 
     await notification.save();
+    console.log('تم إنشاء الإشعار:', notification);
 
-    // إرسال إشعار Firebase
+    // إرسال إشعار Firebase للحجز الجديد
     if (user.fcmToken) {
-      const message = {
-        notification: {
-          title: 'حجز جديد',
-          body: `تم حجز الخدمة بنجاح: ${service.name}`,
-        },
-        data: {
-          bookingId: savedBooking._id.toString(),
-          userId: userId,
-          type: 'new_booking',
-          userPhone: user.phone // إضافة رقم الهاتف للإشعار
-        },
-        token: user.fcmToken
-      };
-
+      console.log('FCM Token موجود للمستخدم:', user.fcmToken);
       try {
-        await admin.messaging().send(message);
-        console.log('تم إرسال الإشعار بنجاح');
+        const message = {
+          notification: {
+            title: 'حجز جديد',
+            body: `تم حجز الخدمة بنجاح: ${service.name}`,
+          },
+          data: {
+            bookingId: savedBooking._id.toString(),
+            userId: userId,
+            type: 'new_booking',
+            userPhone: user.phone
+          },
+          token: user.fcmToken
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log('تم إرسال إشعار Firebase بنجاح:', response);
       } catch (error) {
         console.error('خطأ في إرسال إشعار Firebase:', error);
+        console.error('تفاصيل الرسالة:', {
+          userId,
+          fcmToken: user.fcmToken,
+          serviceName: service.name
+        });
       }
+    } else {
+      console.warn('لا يوجد FCM Token للمستخدم:', userId);
+    }
+
+    // إرسال إشعار Firebase لمقدم الخدمة
+    const therapist = await Therapist.findById(service.therapistId);
+    if (therapist?.fcmToken) {
+      console.log('FCM Token موجود لمقدم الخدمة:', therapist.fcmToken);
+      try {
+        const message = {
+          notification: {
+            title: 'حجز جديد',
+            body: `تم حجز خدمتك: ${service.name}`,
+          },
+          data: {
+            bookingId: savedBooking._id.toString(),
+            userId: userId,
+            type: 'new_booking',
+            userPhone: user.phone
+          },
+          token: therapist.fcmToken
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log('تم إرسال إشعار Firebase لمقدم الخدمة بنجاح:', response);
+      } catch (error) {
+        console.error('خطأ في إرسال إشعار Firebase لمقدم الخدمة:', error);
+        console.error('تفاصيل الرسالة:', {
+          therapistId: service.therapistId,
+          fcmToken: therapist.fcmToken,
+          serviceName: service.name
+        });
+      }
+    } else {
+      console.warn('لا يوجد FCM Token لمقدم الخدمة:', service.therapistId);
     }
 
     res.status(201).json({
@@ -165,9 +212,7 @@ router.post('/', async (req, res) => {
     console.error('Error creating booking:', error);
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
-});
-
-// الحصول على إشعارات مستخدم معين
+});// الحصول على إشعارات مستخدم معين
 router.get('/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;

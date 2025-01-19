@@ -200,6 +200,7 @@ router.post('/:notificationId/status', async (req, res) => {
       return res.status(400).json({ error: 'حالة غير صالحة' });
     }
 
+    // جلب الإشعار مع تفاصيل الحجز والمستخدم
     const notification = await Notification.findById(notificationId)
       .populate({
         path: 'bookingId',
@@ -222,10 +223,11 @@ router.post('/:notificationId/status', async (req, res) => {
 
     // تحديث حالة الإشعار
     notification.status = status;
-    
+
     // إضافة رقم الهاتف عند قبول الطلب
     if (status === 'accepted' && notification.bookingId?.userId?.phone) {
       notification.userPhone = notification.bookingId.userId.phone;
+      console.log('User phone added:', notification.userPhone); // طباعة للتأكد
     }
 
     await notification.save();
@@ -244,7 +246,10 @@ router.post('/:notificationId/status', async (req, res) => {
       console.log('User FCM token not found, skipping notification');
       return res.json({
         message: 'تم تحديث الحالة بنجاح',
-        notification
+        notification: {
+          ...notification.toObject(),
+          userPhone: status === 'accepted' ? user.phone : undefined // إضافة رقم الهاتف للرد
+        }
       });
     }
 
@@ -294,6 +299,7 @@ router.post('/:notificationId/status', async (req, res) => {
     });
   }
 });
+
 
 // جلب الإشعارات للخدمة
 router.get('/service/:serviceId', async (req, res) => {

@@ -126,7 +126,7 @@ router.get('/:userId', async (req, res) => {
       createdAt: notification.createdAt,
       bookingDetails: notification.bookingId,
       serviceDetails: notification.bookingId?.serviceId,
-      userPhone: notification.userPhone // إضافة رقم الهاتف للبيانات المُرسلة
+      userPhone: notification.userPhone || notification.bookingId?.userId?.phone // إضافة رقم الهاتف للبيانات المُرسلة
     }));
 
     res.status(200).json(formattedNotifications);
@@ -176,7 +176,8 @@ router.get('/therapist/:therapistId', async (req, res) => {
         status: notification.bookingId.status,
         user: notification.bookingId.userId,
         service: notification.bookingId.serviceId
-      }
+      },
+      userPhone: notification.userPhone || notification.bookingId?.userId?.phone // إضافة رقم الهاتف للبيانات المُرسلة
     }));
 
     res.status(200).json(formattedNotifications);
@@ -317,7 +318,8 @@ router.get('/service/:serviceId', async (req, res) => {
       status: notification.status,
       createdAt: notification.createdAt,
       bookingDetails: notification.bookingId,
-      serviceDetails: notification.bookingId?.serviceId
+      serviceDetails: notification.bookingId?.serviceId,
+      userPhone: notification.userPhone || notification.bookingId?.userId?.phone // إضافة رقم الهاتف للبيانات المُرسلة
     }));
 
     console.log('Notifications found:', formattedNotifications);
@@ -328,5 +330,4 @@ router.get('/service/:serviceId', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
   }
 });
-
 module.exports = router;

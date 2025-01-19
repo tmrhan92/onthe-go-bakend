@@ -103,27 +103,25 @@ router.post('/', async (req, res) => {
       therapistId: service.therapistId, // تأكد من وجود هذا الحقل في نموذج الخدمة
       date: new Date(date),
       time,
+      userPhone: user.phone, // إضافة رقم هاتف المستخدم
       status: 'pending'
     });
 
     const savedBooking = await newBooking.save();
 
     // إنشاء الإشعار
-  const notification = new Notification({
-  userId: userId,
-  bookingId: savedBooking._id,
-  message: `تم حجز خدمة ${service.name} بنجاح`,
-  status: 'pending',
-  createdAt: new Date(),
-  serviceId: service._id, // إضافة معرف الخدمة
-  serviceName: service.name, // إضافة اسم الخدمة
-  servicePrice: service.price, // إضافة سعر الخدمة
-  serviceDescription: service.description || '', // إضافة وصف الخدمة
-  userPhone: user.phone // إضافة رقم الهاتف
-
-});
-
-
+    const notification = new Notification({
+      userId: userId,
+      bookingId: savedBooking._id,
+      message: `تم حجز خدمة ${service.name} بنجاح`,
+      status: 'pending',
+      createdAt: new Date(),
+      serviceId: service._id, // إضافة معرف الخدمة
+      serviceName: service.name, // إضافة اسم الخدمة
+      servicePrice: service.price, // إضافة سعر الخدمة
+      serviceDescription: service.description || '', // إضافة وصف الخدمة
+      userPhone: user.phone // إضافة رقم الهاتف
+    });
 
     await notification.save();
 
@@ -142,7 +140,6 @@ router.post('/', async (req, res) => {
           servicePrice: service.price.toString(),
           serviceDescription: service.description || '',
           userPhone: user.phone, // إضافة رقم هاتف طالب الخدمة
-
         },
         token: user.fcmToken
       };

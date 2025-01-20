@@ -126,8 +126,19 @@ router.get('/:serviceId', async (req, res) => {
 // الحصول على الخدمات حسب النوع
 router.get('/:serviceType', async (req, res) => {
   const serviceType = decodeURIComponent(req.params.serviceType); // فك ترميز URL
+  const { province, area } = req.query; // استخراج المحافظة والمنطقة من query parameters
+  let query = { serviceType };
+
+  if (province) {
+    query.province = province; // تصفية حسب المحافظة
+  }
+
+  if (area) {
+    query.area = area; // تصفية حسب المنطقة
+  }
+
   try {
-    const services = await Service.find({ serviceType });
+    const services = await Service.find(query);
     if (services.length === 0) {
       return res.status(404).json({ message: 'لا توجد خدمات متاحة' });
     }

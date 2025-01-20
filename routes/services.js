@@ -46,7 +46,6 @@ router.get('/', async (req, res) => {
 });
 
 // إضافة خدمة جديدة
-const Service = require('../models/Service');
 
 // إنشاء خدمة جديدة
 router.post('/', async (req, res) => {

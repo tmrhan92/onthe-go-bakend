@@ -12,7 +12,7 @@ const generateServiceId = (name, serviceType) => {
 // استرجاع جميع الخدمات
 router.get('/', async (req, res) => {
   try {
-    const { type, minPrice, maxPrice, subCategory } = req.query;
+    const { type, minPrice, maxPrice, subCategory, province, area } = req.query;
     let query = {};
 
     if (type) {
@@ -31,6 +31,14 @@ router.get('/', async (req, res) => {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+
+    if (province) {
+      query.province = province; // تصفية حسب المحافظة
+    }
+
+    if (area) {
+      query.area = area; // تصفية حسب المنطقة
     }
 
     const services = await Service.find(query);
@@ -58,6 +66,8 @@ router.post(
     body('latitude').isNumeric().withMessage('خط الطول يجب أن يكون رقماً'),
     body('longitude').isNumeric().withMessage('خط العرض يجب أن يكون رقماً'),
     body('therapistId').notEmpty().withMessage('معرف المعالج مطلوب'),
+    body('province').notEmpty().withMessage('المحافظة مطلوبة'), // التحقق من المحافظة
+    body('area').notEmpty().withMessage('المنطقة مطلوبة'), // التحقق من المنطقة
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -65,12 +75,11 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, description, serviceType, price, duration, subCategory, latitude, longitude, therapistId } = req.body;
+    const { name, description, serviceType, price, duration, subCategory, latitude, longitude, therapistId, province, area } = req.body;
 
     const _id = generateServiceId(name, serviceType);
 
     try {
-      // التحقق من وجود خدمة بنفس المعرف
       const existingService = await Service.findById(_id);
       if (existingService) {
         return res.status(400).json({ message: "الخدمة موجودة مسبقاً" });
@@ -87,6 +96,8 @@ router.post(
         latitude,
         longitude,
         therapistId,
+        province, // إضافة المحافظة
+        area, // إضافة المنطقة
       });
 
       await service.save();

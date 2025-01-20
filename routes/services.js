@@ -107,7 +107,6 @@ router.post(
     }
   }
 );
-
 // الحصول على تفاصيل خدمة معينة
 router.get('/:serviceId', async (req, res) => {
   const { serviceId } = req.params;

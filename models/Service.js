@@ -1,9 +1,7 @@
-// models/Service.js
 const mongoose = require('mongoose');
 
-
-const serviceSchema = new mongoose.Schema({
-  _id: { type: String, required: true },
+// تعريف Schema
+const ServiceSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String, required: true },
   serviceType: { type: String, required: true },
@@ -16,6 +14,6 @@ const serviceSchema = new mongoose.Schema({
   province: { type: String, required: true }, // المحافظة
   area: { type: String, required: true }, // المنطقة
 });
-module.exports = mongoose.model('Service', ServiceSchema);
 
+// تصدير النموذج
 module.exports = mongoose.model('Service', ServiceSchema);

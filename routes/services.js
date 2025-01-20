@@ -46,8 +46,6 @@ router.get('/', async (req, res) => {
 });
 
 // إضافة خدمة جديدة
-const express = require('express');
-const router = express.Router();
 const Service = require('../models/Service');
 
 // إنشاء خدمة جديدة
@@ -106,8 +104,27 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+// جلب الخدمات حسب المحافظة والمنطقة
+router.get('/by-location', async (req, res) => {
+  try {
+    const { governorate, area } = req.query;
 
-module.exports = router;
+    if (!governorate || !area) {
+      return res.status(400).json({ error: 'المحافظة والمنطقة مطلوبان' });
+    }
+
+    const services = await Service.find({ governorate, area });
+
+    if (services.length === 0) {
+      return res.status(404).json({ message: 'لا توجد خدمات في هذه المنطقة' });
+    }
+
+    res.json(services);
+  } catch (error) {
+    console.error('Error fetching services by location:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 // الحصول على تفاصيل خدمة معينة
 router.get('/:serviceId', async (req, res) => {
   const { serviceId } = req.params;

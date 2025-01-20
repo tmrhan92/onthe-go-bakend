@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const Service = require('../models/Service'); // تأكد من المسار الصحيح
+const Service = require('../models/Service');
 const router = express.Router();
 
 // دالة لتوليد معرف الـ Service
@@ -9,7 +9,7 @@ const generateServiceId = (name, serviceType) => {
   return `${name.toLowerCase().replace(/\s+/g, '_')}_${serviceType.toLowerCase().replace(/\s+/g, '_')}_${timestamp}`;
 };
 
-// استرجاع جميع الخدمات
+// استرجاع جميع الخدمات مع التصفية حسب المحافظة والمنطقة
 router.get('/', async (req, res) => {
   try {
     const { type, minPrice, maxPrice, subCategory, province, area } = req.query;

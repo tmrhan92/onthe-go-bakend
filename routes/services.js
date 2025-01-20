@@ -15,6 +15,18 @@ router.get('/', async (req, res) => {
     const { type, minPrice, maxPrice, subCategory, province, area } = req.query;
     let query = {};
 
+    // شرط أساسي: يجب توفر المحافظة والمنطقة
+    if (!province || !area) {
+      return res.status(400).json({ 
+        message: "يجب تحديد المحافظة والمنطقة للبحث عن الخدمات" 
+      });
+    }
+
+    // إضافة شروط الموقع دائماً للاستعلام
+    query.province = province;
+    query.area = area;
+
+    // إضافة باقي شروط البحث
     if (type) {
       const [serviceType, subCat] = type.split('/');
       query.serviceType = serviceType;
@@ -33,17 +45,12 @@ router.get('/', async (req, res) => {
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
-    if (province) {
-      query.province = province; // تصفية حسب المحافظة
-    }
-
-    if (area) {
-      query.area = area; // تصفية حسب المنطقة
-    }
-
     const services = await Service.find(query);
+    
     if (services.length === 0) {
-      return res.status(404).json({ message: "لا توجد خدمات متاحة" });
+      return res.status(404).json({ 
+        message: `لا توجد خدمات متاحة في ${area}, ${province}` 
+      });
     }
 
     res.json(services);
@@ -52,6 +59,8 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: "خطأ في تحميل الخدمات" });
   }
 });
+
+
 // إضافة خدمة جديدة
 router.post(
   '/',
@@ -124,22 +133,28 @@ router.get('/:serviceId', async (req, res) => {
 
 // الحصول على الخدمات حسب النوع
 router.get('/:serviceType', async (req, res) => {
-  const serviceType = decodeURIComponent(req.params.serviceType); // فك ترميز URL
-  const { province, area } = req.query; // استخراج المحافظة والمنطقة من query parameters
-  let query = { serviceType };
+  const serviceType = decodeURIComponent(req.params.serviceType);
+  const { province, area } = req.query;
 
-  if (province) {
-    query.province = province; // تصفية حسب المحافظة
+  // التحقق من وجود المحافظة والمنطقة
+  if (!province || !area) {
+    return res.status(400).json({ 
+      message: "يجب تحديد المحافظة والمنطقة للبحث عن الخدمات" 
+    });
   }
 
-  if (area) {
-    query.area = area; // تصفية حسب المنطقة
-  }
+  const query = { 
+    serviceType,
+    province,
+    area
+  };
 
   try {
     const services = await Service.find(query);
     if (services.length === 0) {
-      return res.status(404).json({ message: 'لا توجد خدمات متاحة' });
+      return res.status(404).json({ 
+        message: `لا توجد خدمات متاحة من نوع ${serviceType} في ${area}, ${province}` 
+      });
     }
     res.json(services);
   } catch (error) {

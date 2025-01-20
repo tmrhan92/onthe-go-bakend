@@ -1,7 +1,6 @@
 // models/Service.js
 const mongoose = require('mongoose');
 
-const mongoose = require('mongoose');
 
 const serviceSchema = new mongoose.Schema({
   _id: { type: String, required: true },
@@ -18,7 +17,6 @@ const serviceSchema = new mongoose.Schema({
   area: { type: String, required: true }, // المنطقة
 });
 
-module.exports = mongoose.model('Service', serviceSchema);
 
 
 module.exports = mongoose.model('Service', ServiceSchema);

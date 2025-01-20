@@ -263,6 +263,35 @@ details: error.message
 }
 });
 
+
+router.post('/:bookingId/status', async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['pending', 'accepted', 'rejected', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'حالة غير صالحة' });
+    }
+
+    const booking = await Booking.findByIdAndUpdate(
+      bookingId,
+      { status },
+      { new: true }
+    );
+
+    if (!booking) {
+      return res.status(404).json({ error: 'الحجز غير موجود' });
+    }
+
+    res.json({ message: 'تم تحديث حالة الحجز بنجاح', booking });
+  } catch (error) {
+    console.error('Error updating booking status:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 // تحديث حالة الإشعار
 router.post('/:notificationId/status', async (req, res) => {
 try {

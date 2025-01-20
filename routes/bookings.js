@@ -298,10 +298,27 @@ router.post('/:bookingId/status', async (req, res) => {
       bookingId,
       { status },
       { new: true }
-    );
+    ).populate('userId serviceId');
 
     if (!booking) {
       return res.status(404).json({ error: 'الحجز غير موجود' });
+    }
+
+    // إرسال إشعار Firebase
+    if (booking.userId.fcmToken) {
+      const message = {
+        notification: {
+          title: 'تحديث حالة الحجز',
+          body: `تم تغيير حالة حجزك لخدمة ${booking.serviceId.name} إلى ${status}`,
+        },
+        data: {
+          bookingId: booking._id.toString(),
+          status: status,
+        },
+        token: booking.userId.fcmToken,
+      };
+
+      await admin.messaging().send(message);
     }
 
     res.json({ message: 'تم تحديث حالة الحجز بنجاح', booking });

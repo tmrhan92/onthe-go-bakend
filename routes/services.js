@@ -52,7 +52,6 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: "خطأ في تحميل الخدمات" });
   }
 });
-
 // إضافة خدمة جديدة
 router.post(
   '/',

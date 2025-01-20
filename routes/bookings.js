@@ -263,6 +263,26 @@ details: error.message
 }
 });
 
+// جلب حجوزات طالب الخدمة
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // جلب الحجوزات مع تفاصيل الخدمة
+    const bookings = await Booking.find({ userId })
+      .populate('serviceId', 'name description price duration')
+      .sort({ createdAt: -1 });
+
+    if (bookings.length === 0) {
+      return res.status(404).json({ message: 'لا توجد حجوزات' });
+    }
+
+    res.json(bookings);
+  } catch (error) {
+    console.error('Error fetching user bookings:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 router.post('/:bookingId/status', async (req, res) => {
   try {

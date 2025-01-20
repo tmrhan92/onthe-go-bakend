@@ -46,58 +46,68 @@ router.get('/', async (req, res) => {
 });
 
 // إضافة خدمة جديدة
-router.post(
-  '/',
-  [
-    body('name').notEmpty().withMessage('الاسم مطلوب'),
-    body('description').notEmpty().withMessage('الوصف مطلوب'),
-    body('serviceType').notEmpty().withMessage('نوع الخدمة مطلوب'),
-    body('price').isNumeric().withMessage('السعر يجب أن يكون رقماً'),
-    body('duration').isNumeric().withMessage('المدة يجب أن تكون رقماً'),
-    body('subCategory').notEmpty().withMessage('الفئة الفرعية مطلوبة'),
-    body('latitude').isNumeric().withMessage('خط الطول يجب أن يكون رقماً'),
-    body('longitude').isNumeric().withMessage('خط العرض يجب أن يكون رقماً'),
-    body('therapistId').notEmpty().withMessage('معرف المعالج مطلوب'),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+const express = require('express');
+const router = express.Router();
+const Service = require('../models/Service');
+
+// إنشاء خدمة جديدة
+router.post('/', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      price,
+      duration,
+      serviceType,
+      subCategory,
+      therapistId,
+      latitude,
+      longitude,
+      governorate,
+      area,
+    } = req.body;
+
+    // التحقق من الحقول المطلوبة
+    if (
+      !name ||
+      !description ||
+      !price ||
+      !duration ||
+      !serviceType ||
+      !subCategory ||
+      !therapistId ||
+      !latitude ||
+      !longitude ||
+      !governorate ||
+      !area
+    ) {
+      return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
 
-    const { name, description, serviceType, price, duration, subCategory, latitude, longitude, therapistId } = req.body;
+    // إنشاء الخدمة
+    const newService = new Service({
+      name,
+      description,
+      price,
+      duration,
+      serviceType,
+      subCategory,
+      therapistId,
+      latitude,
+      longitude,
+      governorate,
+      area,
+    });
 
-    const _id = generateServiceId(name, serviceType);
-
-    try {
-      // التحقق من وجود خدمة بنفس المعرف
-      const existingService = await Service.findById(_id);
-      if (existingService) {
-        return res.status(400).json({ message: "الخدمة موجودة مسبقاً" });
-      }
-
-      const service = new Service({
-        _id,
-        name,
-        description,
-        serviceType,
-        price,
-        duration,
-        subCategory,
-        latitude,
-        longitude,
-        therapistId,
-      });
-
-      await service.save();
-      res.status(201).json(service);
-    } catch (error) {
-      console.error("Error while adding service:", error);
-      res.status(500).json({ message: "فشل في إضافة الخدمة" });
-    }
+    const savedService = await newService.save();
+    res.status(201).json(savedService);
+  } catch (error) {
+    console.error('Error creating service:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-);
+});
 
+module.exports = router;
 // الحصول على تفاصيل خدمة معينة
 router.get('/:serviceId', async (req, res) => {
   const { serviceId } = req.params;

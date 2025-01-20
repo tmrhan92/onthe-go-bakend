@@ -16,7 +16,6 @@ const serviceSchema = new mongoose.Schema({
   province: { type: String, required: true }, // المحافظة
   area: { type: String, required: true }, // المنطقة
 });
-
-
+module.exports = mongoose.model('Service', ServiceSchema);
 
 module.exports = mongoose.model('Service', ServiceSchema);

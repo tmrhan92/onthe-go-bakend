@@ -11,28 +11,31 @@ router.post('/', authMiddleware, async (req, res) => {
     const { serviceId } = req.body;
     const service = await Service.findById(serviceId);
     if (!service) {
-      return res.status(404).json({ error: 'Service not found' });
+      return res.status(404).json({ success: false, error: 'الخدمة غير موجودة' });
     }
     if (req.user.timeBalance < service.hoursRequired) {
-      return res.status(400).json({ error: 'Insufficient time balance' });
+      return res.status(400).json({ success: false, error: 'رصيد الوقت غير كافي' });
+    }
+    if (service.therapistId.toString() === req.user._id.toString()) {
+      return res.status(400).json({ success: false, error: 'لا يمكنك طلب خدمة من نفسك' });
     }
 
     // إنشاء المعاملة
     const transaction = await Transaction.create({
-      provider: service.therapistId, // مقدم الخدمة
-      receiver: req.user._id, // المستفيد
+      provider: service.therapistId,
+      receiver: req.user._id,
       service: serviceId,
       hours: service.hoursRequired,
-      status: 'pending', // حالة المعاملة الافتراضية
+      status: 'pending',
     });
 
     // خصم الساعات من رصيد المستفيد
     req.user.timeBalance -= service.hoursRequired;
     await req.user.save();
 
-    res.status(201).json(transaction);
+    res.status(201).json({ success: true, transaction });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 
@@ -44,12 +47,18 @@ router.post('/:transactionId/update-status', authMiddleware, async (req, res) =>
 
     const validStatuses = ['pending', 'completed', 'disputed'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+      return res.status(400).json({ success: false, error: 'حالة غير صالحة' });
     }
 
     const transaction = await Transaction.findById(transactionId);
     if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
+      return res.status(404).json({ success: false, error: 'المعاملة غير موجودة' });
+    }
+    if (
+      transaction.provider.toString() !== req.user._id.toString() &&
+      transaction.receiver.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({ success: false, error: 'غير مصرح بتحديث حالة المعاملة' });
     }
 
     // تحديث حالة المعاملة
@@ -65,9 +74,9 @@ router.post('/:transactionId/update-status', authMiddleware, async (req, res) =>
       }
     }
 
-    res.json({ message: 'Transaction status updated successfully', transaction });
+    res.json({ success: true, message: 'تم تحديث حالة المعاملة بنجاح', transaction });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 
@@ -77,9 +86,19 @@ router.post('/:transactionId/rate', authMiddleware, async (req, res) => {
     const { transactionId } = req.params;
     const { providerRating, receiverRating } = req.body;
 
+    if (!providerRating && !receiverRating) {
+      return res.status(400).json({ success: false, error: 'يرجى تقديم تقييم واحد على الأقل' });
+    }
+
     const transaction = await Transaction.findById(transactionId);
     if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
+      return res.status(404).json({ success: false, error: 'المعاملة غير موجودة' });
+    }
+    if (
+      transaction.provider.toString() !== req.user._id.toString() &&
+      transaction.receiver.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({ success: false, error: 'غير مصرح بتقديم التقييم' });
     }
 
     // تحديث تقييم مقدم الخدمة
@@ -100,9 +119,9 @@ router.post('/:transactionId/rate', authMiddleware, async (req, res) => {
       }
     }
 
-    res.json({ message: 'Ratings updated successfully', transaction });
+    res.json({ success: true, message: 'تم تحديث التقييمات بنجاح', transaction });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 
@@ -111,14 +130,14 @@ router.get('/user', authMiddleware, async (req, res) => {
   try {
     const transactions = await Transaction.find({
       $or: [
-        { provider: req.user._id }, // المعاملات التي يكون فيها المستخدم مقدم الخدمة
-        { receiver: req.user._id }, // المعاملات التي يكون فيها المستخدم مستفيد
+        { provider: req.user._id },
+        { receiver: req.user._id },
       ],
     }).populate('provider receiver service');
 
-    res.json(transactions);
+    res.json({ success: true, transactions });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 

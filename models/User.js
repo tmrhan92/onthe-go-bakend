@@ -49,6 +49,11 @@ phone: { // إضافة حقل رقم الهاتف
         default: null,
         trim: true
     },
+            timeBalance: {
+        type: Number,
+        default: 0,
+    },
+
     createdAt: {
         type: Date,
         default: Date.now

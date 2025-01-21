@@ -31,7 +31,7 @@ const ServiceSchema = new mongoose.Schema({
   },
   hoursRequired: {
     type: Number,
-    required: true,
+    required: false,
   },
   latitude: {
     type: Number,

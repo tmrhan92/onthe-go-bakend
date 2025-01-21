@@ -1,7 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Service = require('../models/Service');
-const User = require('../models/User'); // استيراد نموذج المستخدم
 const router = express.Router();
 
 // دالة لتوليد معرف الـ Service
@@ -13,7 +12,7 @@ const generateServiceId = (name, serviceType) => {
 // استرجاع جميع الخدمات مع التصفية حسب المحافظة والمنطقة
 router.get('/', async (req, res) => {
   try {
-    const { type, minPrice, maxPrice, subCategory, province, area, minHours, maxHours } = req.query;
+    const { type, minPrice, maxPrice, subCategory, province, area } = req.query;
     let query = {};
 
     // شرط أساسي: يجب توفر المحافظة والمنطقة
@@ -46,12 +45,6 @@ router.get('/', async (req, res) => {
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
-    if (minHours || maxHours) {
-      query.hoursRequired = {};
-      if (minHours) query.hoursRequired.$gte = parseFloat(minHours);
-      if (maxHours) query.hoursRequired.$lte = parseFloat(maxHours);
-    }
-
     const services = await Service.find(query);
     
     if (services.length === 0) {
@@ -67,6 +60,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+
 // إضافة خدمة جديدة
 router.post(
   '/',
@@ -76,7 +70,6 @@ router.post(
     body('serviceType').notEmpty().withMessage('نوع الخدمة مطلوب'),
     body('price').isNumeric().withMessage('السعر يجب أن يكون رقماً'),
     body('duration').isNumeric().withMessage('المدة يجب أن تكون رقماً'),
-    body('hoursRequired').isNumeric().withMessage('عدد الساعات المطلوبة يجب أن يكون رقماً'),
     body('subCategory').notEmpty().withMessage('الفئة الفرعية مطلوبة'),
     body('latitude').isNumeric().withMessage('خط الطول يجب أن يكون رقماً'),
     body('longitude').isNumeric().withMessage('خط العرض يجب أن يكون رقماً'),
@@ -90,7 +83,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, description, serviceType, price, duration, hoursRequired, subCategory, latitude, longitude, therapistId, province, area } = req.body;
+    const { name, description, serviceType, price, duration, subCategory, latitude, longitude, therapistId, province, area } = req.body;
 
     const _id = generateServiceId(name, serviceType);
 
@@ -107,7 +100,6 @@ router.post(
         serviceType,
         price,
         duration,
-        hoursRequired,
         subCategory,
         latitude,
         longitude,
@@ -124,7 +116,6 @@ router.post(
     }
   }
 );
-
 // الحصول على تفاصيل خدمة معينة
 router.get('/:serviceId', async (req, res) => {
   const { serviceId } = req.params;
@@ -143,7 +134,7 @@ router.get('/:serviceId', async (req, res) => {
 // الحصول على الخدمات حسب النوع
 router.get('/:serviceType', async (req, res) => {
   const serviceType = decodeURIComponent(req.params.serviceType);
-  const { province, area, minHours, maxHours } = req.query;
+  const { province, area } = req.query;
 
   // التحقق من وجود المحافظة والمنطقة
   if (!province || !area) {
@@ -158,12 +149,6 @@ router.get('/:serviceType', async (req, res) => {
     area
   };
 
-  if (minHours || maxHours) {
-    query.hoursRequired = {};
-    if (minHours) query.hoursRequired.$gte = parseFloat(minHours);
-    if (maxHours) query.hoursRequired.$lte = parseFloat(maxHours);
-  }
-
   try {
     const services = await Service.find(query);
     if (services.length === 0) {
@@ -175,44 +160,6 @@ router.get('/:serviceType', async (req, res) => {
   } catch (error) {
     console.error("Error fetching services by type:", error);
     res.status(500).json({ message: 'خطأ في تحميل الخدمات' });
-  }
-});
-
-// تحديث الرصيد الزمني بعد اكتمال الخدمة
-router.post('/:serviceId/complete', async (req, res) => {
-  const { serviceId } = req.params;
-  const { userId } = req.body;
-
-  try {
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ message: 'الخدمة غير موجودة' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'المستخدم غير موجود' });
-    }
-
-    // خصم الساعات من رصيد المستخدم
-    if (user.timeBalance < service.hoursRequired) {
-      return res.status(400).json({ message: 'رصيدك الزمني غير كافي' });
-    }
-
-    user.timeBalance -= service.hoursRequired;
-    await user.save();
-
-    // إضافة الساعات إلى رصيد مقدم الخدمة
-    const therapist = await User.findById(service.therapistId);
-    if (therapist) {
-      therapist.timeBalance += service.hoursRequired;
-      await therapist.save();
-    }
-
-    res.json({ message: 'تم اكتمال الخدمة بنجاح', user, therapist });
-  } catch (error) {
-    console.error("Error completing service:", error);
-    res.status(500).json({ message: 'خطأ في اكتمال الخدمة' });
   }
 });
 

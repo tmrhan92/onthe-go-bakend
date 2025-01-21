@@ -12,7 +12,7 @@ const generateServiceId = (name, serviceType) => {
 // استرجاع جميع الخدمات مع التصفية حسب المحافظة والمنطقة
 router.get('/', async (req, res) => {
   try {
-    const { type, minPrice, maxPrice, subCategory, province, area } = req.query;
+    const { type, minPrice, maxPrice, subCategory, province, area,minHours, maxHours } = req.query;
     let query = {};
 
     // شرط أساسي: يجب توفر المحافظة والمنطقة

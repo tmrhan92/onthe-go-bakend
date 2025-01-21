@@ -58,7 +58,10 @@ router.post('/register', async (req, res) => {
       password: hashedPassword,
       name,
       role,
-      phone // إضافة phone
+      phone, // إضافة phone
+      timeBalance: 0, // إضافة الرصيد الزمني الافتراضي
+      rating: 0, // إضافة التقييم الافتراضي
+      completedServices: 0, // إضافة عدد الخدمات المكتملة الافتراضي
     });
 
     const savedUser = await newUser.save();
@@ -68,54 +71,87 @@ router.post('/register', async (req, res) => {
     res.status(500).send("خطأ في التسجيل");
   }
 });
+
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    try {
-        // تحويل البريد الإلكتروني إلى أحرف صغيرة وإزالة المسافات الزائدة
-        const normalizedEmail = email.toLowerCase().trim();
-        
-        console.log('Login attempt with email:', normalizedEmail);
-        
-        // البحث عن المستخدم
-        const user = await User.findOne({ email: normalizedEmail });
-        console.log('Search query:', { email: normalizedEmail });
-        console.log('User found:', user);
+  try {
+    // تحويل البريد الإلكتروني إلى أحرف صغيرة وإزالة المسافات الزائدة
+    const normalizedEmail = email.toLowerCase().trim();
 
-        if (!user) {
-            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-        }
+    console.log('Login attempt with email:', normalizedEmail);
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        console.log('Password comparison result:', isMatch);
+    // البحث عن المستخدم
+    const user = await User.findOne({ email: normalizedEmail });
+    console.log('Search query:', { email: normalizedEmail });
+    console.log('User found:', user);
 
-        if (!isMatch) {
-            return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-        }
-
-        // إنشاء التوكن
-        const token = jwt.sign(
-            { 
-                userId: user.userId, 
-                role: user.role 
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
-
-        // إرسال الرد
-        res.json({ 
-            token,
-            role: user.role,
-            userId: user.userId,
-            name: user.name // إضافة اسم المستخدم للرد
-        });
-
-    } catch (error) {
-        console.error("Error during login:", error);
-        res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
+    if (!user) {
+      return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
     }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password comparison result:', isMatch);
+
+    if (!isMatch) {
+      return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+    }
+
+    // إنشاء التوكن
+    const token = jwt.sign(
+      {
+        userId: user.userId,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // إرسال الرد مع معلومات إضافية
+    res.json({
+      token,
+      role: user.role,
+      userId: user.userId,
+      name: user.name,
+      timeBalance: user.timeBalance, // إضافة الرصيد الزمني
+      rating: user.rating, // إضافة التقييم
+      completedServices: user.completedServices, // إضافة عدد الخدمات المكتملة
+    });
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
+  }
+});
+// تحديث الرصيد الزمني
+router.post('/update-time-balance', async (req, res) => {
+  try {
+    const { userId, timeBalance } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+    }
+    user.timeBalance = timeBalance;
+    await user.save();
+    res.json({ success: true, timeBalance: user.timeBalance });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
+// تحديث تقييم المستخدم
+router.post('/update-rating', async (req, res) => {
+  try {
+    const { userId, rating } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+    }
+    user.rating = rating;
+    await user.save();
+    res.json({ success: true, rating: user.rating });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 module.exports = router;

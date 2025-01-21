@@ -7,6 +7,8 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fcmRoutes = require('./routes/fcmRoutes');
+const transactionRoutes = require('./routes/transactions'); // استيراد مسار transactions
+
 require('dotenv').config(); // تحميل المتغيرات البيئية من ملف .env
 
 // تعريف المتغيرات
@@ -24,6 +26,7 @@ app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -44,6 +47,8 @@ app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/transactions', transactionRoutes); // مسار transactions
+
 app.use('/api', fcmRoutes);
 
 // مسار رئيسي

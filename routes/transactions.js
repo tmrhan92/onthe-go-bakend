@@ -3,7 +3,7 @@ const router = express.Router();
 const Transaction = require('../models/Transaction');
 const Service = require('../models/Service');
 const User = require('../models/User');
-const authMiddleware = require('../middleware/auth');
+const authMiddleware = require('../auth');
 
 // إنشاء معاملة جديدة
 router.post('/', authMiddleware, async (req, res) => {

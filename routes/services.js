@@ -11,6 +11,7 @@ if (!admin.apps.length) {
     credential: admin.credential.cert(serviceAccount),
   });
 }
+const router = express.Router();
 
 
 // دالة لتوليد معرف الـ Service

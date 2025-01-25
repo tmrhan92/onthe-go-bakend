@@ -209,4 +209,22 @@ router.post('/request-service', async (req, res) => {
     res.status(500).json({ message: 'حدث خطأ أثناء طلب الخدمة' });
   }
 });
+
+// جلب الطلبات التي تمت على مقدم الخدمة
+router.get('/therapist-requests/:therapistId', async (req, res) => {
+  try {
+    const { therapistId } = req.params;
+
+    // جلب الخدمات التي طلبها مقدمي خدمات آخرون
+    const requests = await Service.find({
+      therapistId,
+      requestedBy: { $ne: null },
+    }).populate('requestedBy', 'name email phone');
+
+    res.status(200).json(requests);
+  } catch (error) {
+    console.error('Error fetching therapist requests:', error);
+    res.status(500).json({ message: 'حدث خطأ أثناء جلب الطلبات' });
+  }
+});
 module.exports = router;

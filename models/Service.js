@@ -45,6 +45,10 @@ const ServiceSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+   requestedBy: { // إضافة حقل لتتبع من طلب الخدمة
+    type: String,
+    default: null,
+  },
   province: {
     type: String,
     required: true,

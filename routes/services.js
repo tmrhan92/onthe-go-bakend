@@ -1,8 +1,16 @@
-const express = require('express');
+cconst express = require('express');
 const { body, validationResult } = require('express-validator');
 const Service = require('../models/Service');
-const router = express.Router();
 const Therapist = require('../models/Therapist');
+const admin = require('firebase-admin'); // استيراد firebase-admin
+
+// تهيئة Firebase Admin SDK
+if (!admin.apps.length) {
+  const serviceAccount = require('path/to/your/serviceAccountKey.json'); // المسار إلى ملف مفاتيح الخدمة
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 
 // دالة لتوليد معرف الـ Service

@@ -46,7 +46,15 @@ const UserSchema = new mongoose.Schema({
   },
   timeBalance: {
     type: Number,
-    default: 0,
+    default: 0, // الرصيد الزمني الافتراضي
+  },
+  earnedHours: {
+    type: Number,
+    default: 0, // الساعات المكتسبة من تقديم الخدمات
+  },
+  spentHours: {
+    type: Number,
+    default: 0, // الساعات المنفقة على طلب الخدمات
   },
   rating: {
     type: Number,

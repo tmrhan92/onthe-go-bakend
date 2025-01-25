@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 const { isEmail } = require('validator');
 
+/**
+ * نموذج المستخدم (User)
+ * - يحتوي على معلومات المستخدم الأساسية مثل الاسم والبريد الإلكتروني وكلمة المرور.
+ * - يتتبع الرصيد الزمني (`timeBalance`) وعدد الخدمات المكتملة (`completedServices`).
+ * - يدعم أدوارًا متعددة مثل "طالب_خدمة" و"مقدم_خدمة".
+ */
 const UserSchema = new mongoose.Schema({
   _id: {
     type: String, // تعريف _id كسلسلة
@@ -74,5 +80,15 @@ const UserSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+// Virtual لحساب الرصيد الزمني تلقائيًا
+UserSchema.virtual('calculatedTimeBalance').get(function () {
+  return this.earnedHours - this.spentHours;
+});
+
+// تحقق من أن الرصيد الزمني لا يكون سالبًا
+UserSchema.path('timeBalance').validate(function (value) {
+  return value >= 0;
+}, 'الرصيد الزمني لا يمكن أن يكون سالبًا');
 
 module.exports = mongoose.model('User', UserSchema);

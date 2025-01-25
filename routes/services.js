@@ -2,6 +2,8 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Service = require('../models/Service');
 const router = express.Router();
+const Therapist = require('../models/Therapist');
+
 
 // دالة لتوليد معرف الـ Service
 const generateServiceId = (name, serviceType) => {

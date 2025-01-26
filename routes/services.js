@@ -178,49 +178,38 @@ router.get('/:serviceType', async (req, res) => {
 // طلب خدمة من مقدم خدمة آخر
 router.post('/request-service', async (req, res) => {
   try {
-    const { serviceId, requestedBy } = req.body;
+    const { serviceId, requestedBy, hoursRequired } = req.body;
 
     // التحقق من وجود الخدمة
     const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ message: 'الخدمة غير موجودة' });
+    const user = await User.findById(requestedBy);
+
+    if (!service || !user) {
+      return res.status(404).json({ message: 'الخدمة أو المستخدم غير موجود' });
     }
 
-    // التحقق من أن مقدم الخدمة لا يطلب خدمة من نفسه
-    if (service.therapistId === requestedBy) {
-      return res.status(400).json({ message: 'لا يمكنك طلب خدمة من نفسك' });
+    // التحقق من رصيد الوقت
+    if (user.timeBalance < hoursRequired) {
+      return res.status(400).json({ message: 'رصيد الوقت غير كافٍ' });
     }
 
-    // تحديث الخدمة لإضافة مقدم الخدمة الذي طلبها
+    // خصم الوقت
+    user.timeBalance -= hoursRequired;
+    await user.save();
+
+    // تحديث الخدمة
     service.requestedBy = requestedBy;
-    service.status = 'ongoing'; // تغيير حالة الخدمة إلى "قيد التنفيذ"
+    service.status = 'ongoing';
     await service.save();
 
-    // إرسال إشعار لمقدم الخدمة الأصلي
-    const therapist = await Therapist.findById(service.therapistId);
-    if (therapist?.fcmToken) {
-      const message = {
-        notification: {
-          title: 'طلب خدمة جديد',
-          body: `تم طلب خدمتك "${service.name}" من قبل مقدم خدمة آخر.`,
-        },
-        data: {
-          serviceId: service._id.toString(),
-          requestedBy: requestedBy,
-        },
-        token: therapist.fcmToken,
-      };
-
-      await admin.messaging().send(message);
-    }
-
-    res.status(200).json({ message: 'تم طلب الخدمة بنجاح', service });
+    res.status(200).json({ 
+      message: 'تم طلب الخدمة بنجاح', 
+      remainingTimeBalance: user.timeBalance 
+    });
   } catch (error) {
-    console.error('Error requesting service:', error);
     res.status(500).json({ message: 'حدث خطأ أثناء طلب الخدمة' });
   }
 });
-
 // جلب الطلبات التي تمت على مقدم الخدمة
 router.get('/therapist-requests/:therapistId', async (req, res) => {
   try {

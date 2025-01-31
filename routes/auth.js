@@ -154,4 +154,23 @@ router.post('/update-rating', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// مسار للحصول على الرصيد الزمني للمستخدم
+router.get('/:userId/time-balance', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        // البحث عن المستخدم
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+        }
+
+        // إرجاع الرصيد الزمني
+        res.json({ success: true, timeBalance: user.timeBalance });
+    } catch (error) {
+        console.error('Error fetching user time balance:', error);
+        res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
+    }
+});
+
 module.exports = router;

@@ -176,40 +176,64 @@ router.get('/:serviceType', async (req, res) => {
 
 
 // طلب خدمة من مقدم خدمة آخر
-router.post('/request-service', async (req, res) => {
-  try {
-    const { serviceId, requestedBy, hoursRequired } = req.body;
-
-    // التحقق من وجود الخدمة
-    const service = await Service.findById(serviceId);
-    const user = await User.findById(requestedBy);
-
-    if (!service || !user) {
-      return res.status(404).json({ message: 'الخدمة أو المستخدم غير موجود' });
+router.post(
+  '/request-service',
+  [
+    body('serviceId').notEmpty().withMessage('معرف الخدمة مطلوب'),
+    body('requestedBy').notEmpty().withMessage('معرف المستخدم مطلوب'),
+    body('hoursRequired').isNumeric().withMessage('عدد الساعات يجب أن يكون رقماً'),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    // التحقق من رصيد الوقت
-    if (user.timeBalance < hoursRequired) {
-      return res.status(400).json({ message: 'رصيد الوقت غير كافٍ' });
+    try {
+      const { serviceId, requestedBy, hoursRequired } = req.body;
+
+      console.log('Request data:', { serviceId, requestedBy, hoursRequired });
+
+      // التحقق من وجود الخدمة والمستخدم
+      const service = await Service.findById(serviceId);
+      const user = await User.findById(requestedBy);
+
+      if (!service) {
+        console.error('Service not found:', serviceId);
+        return res.status(404).json({ message: 'الخدمة غير موجودة' });
+      }
+
+      if (!user) {
+        console.error('User not found:', requestedBy);
+        return res.status(404).json({ message: 'المستخدم غير موجود' });
+      }
+
+      // التحقق من رصيد الوقت
+      if (user.timeBalance < hoursRequired) {
+        console.error('Insufficient time balance:', user.timeBalance);
+        return res.status(400).json({ message: 'رصيد الوقت غير كافٍ' });
+      }
+
+      // خصم الوقت من رصيد المستخدم
+      user.timeBalance -= hoursRequired;
+      await user.save();
+
+      // تحديث حالة الخدمة
+      service.requestedBy = requestedBy;
+      service.status = 'ongoing';
+      await service.save();
+
+      res.status(200).json({
+        message: 'تم طلب الخدمة بنجاح',
+        remainingTimeBalance: user.timeBalance,
+      });
+    } catch (error) {
+      console.error('Error in request-service:', error);
+      res.status(500).json({ message: 'حدث خطأ أثناء طلب الخدمة' });
     }
-
-    // خصم الوقت
-    user.timeBalance -= hoursRequired;
-    await user.save();
-
-    // تحديث الخدمة
-    service.requestedBy = requestedBy;
-    service.status = 'ongoing';
-    await service.save();
-
-    res.status(200).json({ 
-      message: 'تم طلب الخدمة بنجاح', 
-      remainingTimeBalance: user.timeBalance 
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'حدث خطأ أثناء طلب الخدمة' });
   }
-});
+);
+
 // جلب الطلبات التي تمت على مقدم الخدمة
 router.get('/therapist-requests/:therapistId', async (req, res) => {
   try {

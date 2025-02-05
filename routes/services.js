@@ -3,6 +3,8 @@ const { body, validationResult } = require('express-validator');
 const Service = require('../models/Service');
 const Therapist = require('../models/Therapist');
 const admin = require('firebase-admin'); // استيراد firebase-admin
+const User = require('../models/User');
+
 
 // تهيئة Firebase Admin SDK
 if (!admin.apps.length) {

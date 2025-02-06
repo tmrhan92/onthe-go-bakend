@@ -197,6 +197,11 @@ router.post(
 
       console.log('Request data:', { serviceId, requestedBy, hoursRequired });
 
+      // التحقق من أن hoursRequired أكبر من الصفر
+      if (hoursRequired <= 0) {
+        return res.status(400).json({ message: 'عدد الساعات يجب أن يكون أكبر من الصفر' });
+      }
+
       // التحقق من وجود الخدمة والمستخدم
       const service = await Service.findById(serviceId);
       const user = await User.findById(requestedBy);
@@ -209,6 +214,11 @@ router.post(
       if (!user) {
         console.error('User not found:', requestedBy);
         return res.status(404).json({ message: 'المستخدم غير موجود' });
+      }
+
+      // التحقق من أن المستخدم لا يطلب خدمة من نفسه
+      if (service.therapistId.toString() === requestedBy) {
+        return res.status(400).json({ message: 'لا يمكنك طلب خدمة من نفسك' });
       }
 
       // التحقق من رصيد الوقت
@@ -226,6 +236,20 @@ router.post(
       service.status = 'ongoing';
       await service.save();
 
+      // إرسال إشعار Firebase إلى مقدم الخدمة
+      const therapist = await User.findById(service.therapistId);
+      if (therapist && therapist.fcmToken) {
+        const message = {
+          notification: {
+            title: 'طلب خدمة جديد',
+            body: `تم طلب خدمتك: ${service.name}`,
+          },
+          token: therapist.fcmToken,
+        };
+
+        await admin.messaging().send(message);
+      }
+
       res.status(200).json({
         message: 'تم طلب الخدمة بنجاح',
         remainingTimeBalance: user.timeBalance,
@@ -236,7 +260,6 @@ router.post(
     }
   }
 );
-
 // جلب الطلبات التي تمت على مقدم الخدمة
 router.get('/therapist-requests/:therapistId', async (req, res) => {
   try {

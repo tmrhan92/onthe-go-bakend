@@ -276,5 +276,4 @@ router.get('/therapist-requests/:therapistId', async (req, res) => {
     console.error('Error fetching therapist requests:', error);
     res.status(500).json({ message: 'حدث خطأ أثناء جلب الطلبات' });
   }
-});
-module.exports = router;
+});module.exports = router;

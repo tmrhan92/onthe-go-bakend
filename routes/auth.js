@@ -172,13 +172,4 @@ router.get('/:userId/time-balance', async (req, res) => {
         res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
     }
 });
-app.post('/subscriptions/activate', async (req, res) => {
-  const { therapistId } = req.body;
-  await Therapist.findByIdAndUpdate(therapistId, {
-    isSubscriptionActive: true,
-    subscriptionStartDate: new Date() // تحديث تاريخ الاشتراك
-  });
-  res.status(200).json({ message: 'Subscription activated successfully' });
-});
-
 module.exports = router;

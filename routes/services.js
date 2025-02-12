@@ -288,5 +288,21 @@ router.post('/:userId/update-time-balance', async (req, res) => {
     res.status(500).json({ message: 'حدث خطأ في النظام' });
   }
 });
-
+router.post('/:userId/update-hours', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const { earnedHours, spentHours } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'المستخدم غير موجود' });
+    }
+    user.earnedHours = earnedHours;
+    user.spentHours = spentHours;
+    user.timeBalance = earnedHours - spentHours;
+    await user.save();
+    res.json({ message: 'تم تحديث الساعات بنجاح', timeBalance: user.timeBalance });
+  } catch (error) {
+    res.status(500).json({ message: 'حدث خطأ في النظام' });
+  }
+});
 module.exports = router;

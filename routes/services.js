@@ -258,4 +258,18 @@ router.get('/therapist-requests/:therapistId', async (req, res) => {
     console.error('Error fetching therapist requests:', error);
     res.status(500).json({ message: 'حدث خطأ أثناء جلب الطلبات' });
   }
-});module.exports = router;
+});
+
+router.get('/:userId/time-balance', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'المستخدم غير موجود' });
+    }
+    res.json({ timeBalance: user.timeBalance });
+  } catch (error) {
+    res.status(500).json({ message: 'حدث خطأ في النظام' });
+  }
+});
+module.exports = router;

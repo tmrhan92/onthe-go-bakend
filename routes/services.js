@@ -181,87 +181,67 @@ router.get('/:serviceType', async (req, res) => {
 
 
 // طلب خدمة من مقدم خدمة آخر
-router.post(
-  '/request-service',
-  [
-    body('serviceId').notEmpty().withMessage('معرف الخدمة مطلوب'),
-    body('requestedBy').notEmpty().withMessage('معرف المستخدم مطلوب'),
-    body('hoursRequired').isNumeric().withMessage('عدد الساعات يجب أن يكون رقماً'),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+router.post('/request-service', async (req, res) => {
+  try {
+    const { serviceId, requestedBy, hoursRequired } = req.body;
+
+    // التحقق من وجود الخدمة والمستخدم
+    const service = await Service.findById(serviceId);
+    const requestingUser = await User.findById(requestedBy);
+    const serviceProvider = await User.findById(service.therapistId);
+
+    if (!service || !requestingUser || !serviceProvider) {
+      return res.status(404).json({ message: 'الخدمة أو المستخدم غير موجود' });
     }
 
-    try {
-      const { serviceId, requestedBy, hoursRequired } = req.body;
-
-      console.log('Request data:', { serviceId, requestedBy, hoursRequired });
-
-      // التحقق من أن hoursRequired أكبر من الصفر
-      if (hoursRequired <= 0) {
-        return res.status(400).json({ message: 'عدد الساعات يجب أن يكون أكبر من الصفر' });
-      }
-
-      // التحقق من وجود الخدمة والمستخدم
-      const service = await Service.findById(serviceId);
-      const user = await User.findById(requestedBy);
-
-      if (!service) {
-        console.error('Service not found:', serviceId);
-        return res.status(404).json({ message: 'الخدمة غير موجودة' });
-      }
-
-      if (!user) {
-        console.error('User not found:', requestedBy);
-        return res.status(404).json({ message: 'المستخدم غير موجود' });
-      }
-
-      // التحقق من أن المستخدم لا يطلب خدمة من نفسه
-      if (service.therapistId.toString() === requestedBy) {
-        return res.status(400).json({ message: 'لا يمكنك طلب خدمة من نفسك' });
-      }
-
-      // التحقق من رصيد الوقت
-      if (user.timeBalance < hoursRequired) {
-        console.error('Insufficient time balance:', user.timeBalance);
-        return res.status(400).json({ message: 'رصيد الوقت غير كافٍ' });
-      }
-
-      // خصم الوقت من رصيد المستخدم
-      user.timeBalance -= hoursRequired;
-      await user.save();
-
-      // تحديث حالة الخدمة
-      service.requestedBy = requestedBy;
-      service.status = 'ongoing';
-      await service.save();
-
-      // إرسال إشعار Firebase إلى مقدم الخدمة
-      const therapist = await User.findById(service.therapistId);
-      if (therapist && therapist.fcmToken) {
-        const message = {
-          notification: {
-            title: 'طلب خدمة جديد',
-            body: `تم طلب خدمتك: ${service.name}`,
-          },
-          token: therapist.fcmToken,
-        };
-
-        await admin.messaging().send(message);
-      }
-
-      res.status(200).json({
-        message: 'تم طلب الخدمة بنجاح',
-        remainingTimeBalance: user.timeBalance,
-      });
-    } catch (error) {
-      console.error('Error in request-service:', error);
-      res.status(500).json({ message: 'حدث خطأ أثناء طلب الخدمة' });
+    // التحقق من أن المستخدم لا يطلب خدمة من نفسه
+    if (service.therapistId.toString() === requestedBy) {
+      return res.status(400).json({ message: 'لا يمكنك طلب خدمة من نفسك' });
     }
+
+    // التحقق من رصيد الوقت
+    if (requestingUser.timeBalance < hoursRequired) {
+      return res.status(400).json({ message: 'رصيد الوقت غير كافٍ' });
+    }
+
+    // خصم الساعات من رصيد المستخدم الذي يطلب الخدمة
+    requestingUser.spentHours += hoursRequired;
+    requestingUser.timeBalance -= hoursRequired;
+    await requestingUser.save();
+
+    // إضافة الساعات إلى رصيد مقدم الخدمة الذي تم طلب خدمته
+    serviceProvider.earnedHours += hoursRequired;
+    serviceProvider.timeBalance += hoursRequired;
+    await serviceProvider.save();
+
+    // تحديث حالة الخدمة
+    service.requestedBy = requestedBy;
+    service.status = 'ongoing';
+    await service.save();
+
+    // إرسال إشعار Firebase إلى مقدم الخدمة
+    if (serviceProvider.fcmToken) {
+      const message = {
+        notification: {
+          title: 'طلب خدمة جديد',
+          body: `تم طلب خدمتك: ${service.name}`,
+        },
+        token: serviceProvider.fcmToken,
+      };
+
+      await admin.messaging().send(message);
+    }
+
+    res.status(200).json({
+      message: 'تم طلب الخدمة بنجاح',
+      remainingTimeBalance: requestingUser.timeBalance,
+    });
+  } catch (error) {
+    console.error('Error in request-service:', error);
+    res.status(500).json({ message: 'حدث خطأ أثناء طلب الخدمة' });
   }
-);
+});
+
 // جلب الطلبات التي تمت على مقدم الخدمة
 router.get('/therapist-requests/:therapistId', async (req, res) => {
   try {

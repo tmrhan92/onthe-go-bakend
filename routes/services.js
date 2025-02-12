@@ -305,4 +305,18 @@ router.post('/:userId/update-hours', async (req, res) => {
     res.status(500).json({ message: 'حدث خطأ في النظام' });
   }
 });
+
+
+router.get('/:userId/hours', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'المستخدم غير موجود' });
+    }
+    res.json({ earnedHours: user.earnedHours, spentHours: user.spentHours });
+  } catch (error) {
+    res.status(500).json({ message: 'حدث خطأ في النظام' });
+  }
+});
 module.exports = router;

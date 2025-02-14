@@ -134,4 +134,52 @@ router.get('/subscription-status', auth, async (req, res) => {
   }
 });
 
+router.post('/create-checkout-session', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+      customer_email: user.email,
+      metadata: {
+        userId: user._id.toString(),
+      },
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
+  }
+});
+
+// التحقق من حالة الاشتراك
+router.get('/subscription-status/:userId', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    res.json({
+      isActive: user.subscriptionStatus === 'active',
+      endDate: user.subscriptionEndDate,
+    });
+  } catch (error) {
+    console.error('Error fetching subscription status:', error);
+    res.status(500).json({ error: 'فشل في جلب حالة الاشتراك' });
+  }
+});
+
+
 module.exports = router;

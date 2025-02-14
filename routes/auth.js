@@ -19,7 +19,7 @@ const checkContentType = (req, res, next) => {
     next();
 };
 
-// routes/auth.js
+// تحديث FCM Token
 router.post('/update-fcm-token', async (req, res) => {
     try {
         const { userId, fcmToken } = req.body;
@@ -33,6 +33,7 @@ router.post('/update-fcm-token', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
   const { email, password, name, role, phone } = req.body; // إضافة phone
@@ -62,6 +63,8 @@ router.post('/register', async (req, res) => {
       timeBalance: 0, // إضافة الرصيد الزمني الافتراضي
       rating: 0, // إضافة التقييم الافتراضي
       completedServices: 0, // إضافة عدد الخدمات المكتملة الافتراضي
+      subscriptionStatus: 'trial', // حالة الاشتراك الافتراضية
+      trialEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 يومًا من الآن
     });
 
     const savedUser = await newUser.save();
@@ -122,6 +125,7 @@ router.post('/login', async (req, res) => {
     res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
   }
 });
+
 // تحديث الرصيد الزمني
 router.post('/update-time-balance', async (req, res) => {
   try {
@@ -153,6 +157,7 @@ router.post('/update-rating', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 // مسار للحصول على الرصيد الزمني للمستخدم
 router.get('/:userId/time-balance', async (req, res) => {
     try {
@@ -171,4 +176,28 @@ router.get('/:userId/time-balance', async (req, res) => {
         res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
     }
 });
+
+// مسار للتحقق من حالة الاشتراك
+router.get('/subscription-status/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // البحث عن المستخدم
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+    }
+
+    // إرجاع حالة الاشتراك
+    res.json({
+      success: true,
+      subscriptionStatus: user.subscriptionStatus,
+      trialEndDate: user.trialEndDate,
+    });
+  } catch (error) {
+    console.error('Error fetching subscription status:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
+  }
+});
+
 module.exports = router;

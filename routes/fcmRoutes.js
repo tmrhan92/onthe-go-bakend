@@ -111,6 +111,7 @@ router.post('/fcm/token', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 router.post('/save-fcm-token', async (req, res) => {
 const { therapistId, fcmToken } = req.body;
 console.log('Received token request:', { therapistId, fcmToken });
@@ -144,6 +145,8 @@ res.status(500).json({ error: 'Failed to save FCM token' });
 
 
 
+=======
+>>>>>>> c75db6683113fb5b899ad58b66726e749931956f
 // Route to verify token
 router.get('/verify-token/:token', async (req, res) => {
   try {

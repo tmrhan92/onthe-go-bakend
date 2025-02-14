@@ -137,7 +137,14 @@ router.get('/subscription-status', auth, async (req, res) => {
 
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    if (!req.user) {
+      return res.status(401).json({ error: 'المستخدم غير مصادق' });
+    }
+
+    const user = await User.findById(req.user.userId); // استخدام userId بدلاً من _id
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -152,7 +159,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}/cancel`,
       customer_email: user.email,
       metadata: {
-        userId: user._id.toString(),
+        userId: user.userId,
       },
     });
 
@@ -162,7 +169,6 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
-
 // التحقق من حالة الاشتراك
 router.get('/subscription-status/:userId', auth, async (req, res) => {
   try {

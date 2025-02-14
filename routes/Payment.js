@@ -181,5 +181,104 @@ router.get('/subscription-status/:userId', auth, async (req, res) => {
   }
 });
 
+router.post('/create-payment-intent', async (req, res) => {
+  const { amount, currency, userId } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      metadata: { userId },
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: 'Failed to create payment intent' });
+  }
+});
+
+router.post('/confirm-payment', async (req, res) => {
+  const { paymentIntentId, userId } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status === 'succeeded') {
+      const user = await User.findById(userId);
+      if (user) {
+        user.subscriptionStatus = 'active';
+        await user.save();
+      }
+      res.json({ success: true, message: 'Payment succeeded' });
+    } else {
+      res.status(400).json({ success: false, message: 'Payment not succeeded' });
+    }
+  } catch (error) {
+    console.error('Error confirming payment:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
+router.post('/stripe-webhook', async (req, res) => {
+  const event = req.body;
+
+  switch (event.type) {
+    case 'invoice.payment_succeeded':
+      const subscriptionId = event.data.object.subscription;
+      const user = await User.findOne({ stripeSubscriptionId: subscriptionId });
+      if (user) {
+        user.subscriptionStatus = 'active';
+        await user.save();
+      }
+      break;
+    case 'invoice.payment_failed':
+      const failedSubscriptionId = event.data.object.subscription;
+      const failedUser = await User.findOne({ stripeSubscriptionId: failedSubscriptionId });
+      if (failedUser) {
+        failedUser.subscriptionStatus = 'expired';
+        await failedUser.save();
+      }
+      break;
+  }
+
+  res.json({ received: true });
+});
+
+router.post('/create-subscription', async (req, res) => {
+  const { userId, paymentMethodId } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const customer = await stripe.customers.create({
+      payment_method: paymentMethodId,
+      email: user.email,
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: process.env.STRIPE_PRICE_ID }],
+      expand: ['latest_invoice.payment_intent'],
+    });
+
+    user.subscriptionStatus = 'active';
+    user.stripeCustomerId = customer.id;
+    user.stripeSubscriptionId = subscription.id;
+    await user.save();
+
+    res.json({ subscriptionId: subscription.id, clientSecret: subscription.latest_invoice.payment_intent.client_secret });
+  } catch (error) {
+    console.error('Error creating subscription:', error);
+    res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
 
 module.exports = router;

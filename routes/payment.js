@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const auth = require('../middleware/auth'); // تأكد من المسار الصحيح
+const auth = require('./auth'); // تأكد من المسار الصحيح
 const User = require('../models/User');
 
 // إنشاء نية دفع

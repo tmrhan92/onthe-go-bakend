@@ -9,13 +9,13 @@ const { isEmail } = require('validator');
  */
 const UserSchema = new mongoose.Schema({
   _id: {
-    type: String, // تعريف _id كسلسلة
+    type: String,
     required: true,
   },
   userId: {
     type: String,
     required: true,
-    unique: true, // تأكد من أنه فريد
+    unique: true,
   },
   email: {
     type: String,
@@ -52,15 +52,15 @@ const UserSchema = new mongoose.Schema({
   },
   timeBalance: {
     type: Number,
-    default: 0, // الرصيد الزمني الافتراضي
+    default: 0,
   },
   earnedHours: {
     type: Number,
-    default: 0, // الساعات المكتسبة من تقديم الخدمات
+    default: 0,
   },
   spentHours: {
     type: Number,
-    default: 0, // الساعات المنفقة على طلب الخدمات
+    default: 0,
   },
   rating: {
     type: Number,
@@ -75,34 +75,44 @@ const UserSchema = new mongoose.Schema({
     enum: ['basic', 'verified', 'premium'],
     default: 'basic',
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
-
-// Virtual لحساب الرصيد الزمني تلقائيًا
-UserSchema.virtual('calculatedTimeBalance').get(function () {
-  return this.earnedHours - this.spentHours;
-});
-
-// تحقق من أن الرصيد الزمني لا يكون سالبًا
-UserSchema.path('timeBalance').validate(function (value) {
-  return value >= 0;
-}, 'الرصيد الزمني لا يمكن أن يكون سالبًا');
-
-  // حالة الاشتراك (نشط، تجريبي، منتهي)
   subscriptionStatus: {
     type: String,
     enum: ['active', 'trial', 'expired'],
     default: 'trial',
   },
-  // تاريخ انتهاء الفترة التجريبية (30 يوم من تاريخ التسجيل)
   trialEndDate: {
     type: Date,
-    default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
   },
-      }); 
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  }
+}, {
+  // Enable virtuals
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
+// Virtual for calculating time balance
+UserSchema.virtual('calculatedTimeBalance').get(function() {
+  return this.earnedHours - this.spentHours;
+});
+
+// Validate that time balance cannot be negative
+UserSchema.path('timeBalance').validate(function(value) {
+  return value >= 0;
+}, 'الرصيد الزمني لا يمكن أن يكون سالبًا');
+
+// Pre-save middleware to update timeBalance before saving
+UserSchema.pre('save', function(next) {
+  this.timeBalance = this.earnedHours - this.spentHours;
+  next();
+});
+
+// Index creation for frequently queried fields
+UserSchema.index({ email: 1 });
+UserSchema.index({ userId: 1 });
+UserSchema.index({ role: 1 });
 
 module.exports = mongoose.model('User', UserSchema);

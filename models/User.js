@@ -91,4 +91,17 @@ UserSchema.path('timeBalance').validate(function (value) {
   return value >= 0;
 }, 'الرصيد الزمني لا يمكن أن يكون سالبًا');
 
+  // حالة الاشتراك (نشط، تجريبي، منتهي)
+  subscriptionStatus: {
+    type: String,
+    enum: ['active', 'trial', 'expired'],
+    default: 'trial',
+  },
+  // تاريخ انتهاء الفترة التجريبية (30 يوم من تاريخ التسجيل)
+  trialEndDate: {
+    type: Date,
+    default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  },
+
+
 module.exports = mongoose.model('User', UserSchema);

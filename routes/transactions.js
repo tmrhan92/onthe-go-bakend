@@ -183,4 +183,29 @@ router.post('/confirm-payment', async (req, res) => {
   }
 });
 
+router.post('/stripe-webhook', async (req, res) => {
+  const event = req.body;
+
+  switch (event.type) {
+    case 'invoice.payment_succeeded':
+      const subscriptionId = event.data.object.subscription;
+      const user = await User.findOne({ stripeSubscriptionId: subscriptionId });
+      if (user) {
+        user.subscriptionStatus = 'active';
+        await user.save();
+      }
+      break;
+    case 'invoice.payment_failed':
+      const failedSubscriptionId = event.data.object.subscription;
+      const failedUser = await User.findOne({ stripeSubscriptionId: failedSubscriptionId });
+      if (failedUser) {
+        failedUser.subscriptionStatus = 'expired';
+        await failedUser.save();
+      }
+      break;
+  }
+
+  res.json({ received: true });
+});
+
 module.exports = router;

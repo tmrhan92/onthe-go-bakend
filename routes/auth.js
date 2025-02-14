@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
 
+
 // دالة لتوليد userId
 const generateUserId = (name, role) => {
   const timestamp = Date.now(); // إضافة الطابع الزمني
@@ -199,5 +200,24 @@ router.get('/subscription-status/:userId', async (req, res) => {
     res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
   }
 });
+
+const auth = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization').replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findOne({ _id: decoded.userId, 'tokens.token': token });
+
+    if (!user) {
+      throw new Error();
+    }
+
+    req.token = token;
+    req.user = user;
+    next();
+  } catch (error) {
+    res.status(401).send({ error: 'Please authenticate.' });
+  }
+};
+
 
 module.exports = router;

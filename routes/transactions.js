@@ -4,6 +4,8 @@ const Transaction = require('../models/Transaction');
 const Service = require('../models/Service');
 const User = require('../models/User');
 const authMiddleware = require('./auth');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 
 // إنشاء معاملة جديدة
 router.post('/', authMiddleware, async (req, res) => {
@@ -138,6 +140,46 @@ router.get('/user', authMiddleware, async (req, res) => {
     res.json({ success: true, transactions });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+
+router.post('/create-payment-intent', async (req, res) => {
+  const { amount, currency, userId } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      metadata: { userId },
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: 'Failed to create payment intent' });
+  }
+});
+
+router.post('/confirm-payment', async (req, res) => {
+  const { paymentIntentId, userId } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status === 'succeeded') {
+      const user = await User.findById(userId);
+      if (user) {
+        user.subscriptionStatus = 'active';
+        await user.save();
+      }
+      res.json({ success: true, message: 'Payment succeeded' });
+    } else {
+      res.status(400).json({ success: false, message: 'Payment not succeeded' });
+    }
+  } catch (error) {
+    console.error('Error confirming payment:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
 

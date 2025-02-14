@@ -8,6 +8,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fcmRoutes = require('./routes/fcmRoutes');
 const transactionRoutes = require('./routes/transactions'); // استيراد مسار transactions
+const payment = require('./routes/payment'); // استيراد مسار transactions
+
+
 
 require('dotenv').config(); // تحميل المتغيرات البيئية من ملف .env
 
@@ -48,6 +51,8 @@ app.use('/api/services', require('./routes/services'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/transactions', transactionRoutes); // مسار transactions
+app.use('/api/payment', payment); 
+
 
 app.use('/api', fcmRoutes);
 

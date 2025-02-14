@@ -102,6 +102,7 @@ UserSchema.path('timeBalance').validate(function (value) {
     type: Date,
     default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   },
+      }); 
 
 
 module.exports = mongoose.model('User', UserSchema);

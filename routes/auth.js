@@ -77,28 +77,26 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // تحويل البريد الإلكتروني إلى أحرف صغيرة وإزالة المسافات الزائدة
     const normalizedEmail = email.toLowerCase().trim();
-
-    console.log('Login attempt with email:', normalizedEmail);
-
-    // البحث عن المستخدم
     const user = await User.findOne({ email: normalizedEmail });
-    console.log('Search query:', { email: normalizedEmail });
-    console.log('User found:', user);
 
     if (!user) {
       return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log('Password comparison result:', isMatch);
 
     if (!isMatch) {
       return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
     }
 
-    // إنشاء التوكن
+    // التحقق من حالة الاشتراك
+    if (user.role === 'مقدم_خدمة' && user.subscriptionStatus === 'trial' && new Date() > user.trialEndDate) {
+      user.subscriptionStatus = 'expired';
+      await user.save();
+      return res.status(403).send("انتهت فترة التجربة المجانية. يرجى الاشتراك للاستمرار.");
+    }
+
     const token = jwt.sign(
       {
         userId: user.userId,
@@ -108,15 +106,16 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    // إرسال الرد مع معلومات إضافية
     res.json({
       token,
       role: user.role,
       userId: user.userId,
       name: user.name,
-      timeBalance: user.timeBalance, // إضافة الرصيد الزمني
-      rating: user.rating, // إضافة التقييم
-      completedServices: user.completedServices, // إضافة عدد الخدمات المكتملة
+      timeBalance: user.timeBalance,
+      rating: user.rating,
+      completedServices: user.completedServices,
+      subscriptionStatus: user.subscriptionStatus,
+      trialEndDate: user.trialEndDate,
     });
   } catch (error) {
     console.error("Error during login:", error);

@@ -208,4 +208,39 @@ router.post('/stripe-webhook', async (req, res) => {
   res.json({ received: true });
 });
 
+router.post('/create-subscription', async (req, res) => {
+  const { userId, paymentMethodId } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const customer = await stripe.customers.create({
+      payment_method: paymentMethodId,
+      email: user.email,
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: process.env.STRIPE_PRICE_ID }],
+      expand: ['latest_invoice.payment_intent'],
+    });
+
+    user.subscriptionStatus = 'active';
+    user.stripeCustomerId = customer.id;
+    user.stripeSubscriptionId = subscription.id;
+    await user.save();
+
+    res.json({ subscriptionId: subscription.id, clientSecret: subscription.latest_invoice.payment_intent.client_secret });
+  } catch (error) {
+    console.error('Error creating subscription:', error);
+    res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
 module.exports = router;

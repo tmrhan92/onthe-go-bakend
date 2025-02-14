@@ -46,7 +46,7 @@ router.post('/create-payment-intent', auth, async (req, res) => {
 // إنشاء جلسة دفع
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId); // الآن req.user موجود
     if (!user) {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
@@ -64,7 +64,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}/cancel`,
       customer_email: user.email,
       metadata: {
-        userId: user.userId
+        userId: user.userId,
       },
     });
 
@@ -74,6 +74,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
+
 
 // تأكيد الاشتراك
 router.post('/confirm-subscription', auth, async (req, res) => {

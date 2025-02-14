@@ -1,15 +1,16 @@
-
-
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const auth = require('./auth');
+const auth = require('../middleware/auth'); // تأكد من المسار الصحيح
 const User = require('../models/User');
 
 // إنشاء نية دفع
 router.post('/create-payment-intent', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
     
     // إنشاء أو الحصول على عميل Stripe
     let stripeCustomer;
@@ -19,28 +20,58 @@ router.post('/create-payment-intent', auth, async (req, res) => {
       stripeCustomer = await stripe.customers.create({
         email: user.email,
         metadata: {
-          userId: user._id
+          userId: user.userId
         }
       });
       user.stripeCustomerId = stripeCustomer.id;
       await user.save();
     }
 
-    // إنشاء اشتراك
-    const subscription = await stripe.subscriptions.create({
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: req.body.amount,
+      currency: 'usd',
       customer: stripeCustomer.id,
-      items: [{ price: process.env.STRIPE_PRICE_ID }],
-      payment_behavior: 'default_incomplete',
-      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        userId: user.userId
+      }
     });
 
-    res.json({
-      subscriptionId: subscription.id,
-      clientSecret: subscription.latest_invoice.payment_intent.client_secret,
-    });
+    res.json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
-    console.error('Error creating subscription:', error);
-    res.status(500).json({ error: 'فشل في إنشاء الاشتراك' });
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: 'فشل في إنشاء عملية الدفع' });
+  }
+});
+
+// إنشاء جلسة دفع
+router.post('/create-checkout-session', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+      customer_email: user.email,
+      metadata: {
+        userId: user.userId
+      },
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
 
@@ -48,7 +79,10 @@ router.post('/create-payment-intent', auth, async (req, res) => {
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {
     const { subscriptionId } = req.body;
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
 
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     
@@ -85,7 +119,10 @@ router.post('/confirm-subscription', auth, async (req, res) => {
 // إلغاء الاشتراك
 router.post('/cancel-subscription', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
     
     if (!user.stripeSubscriptionId) {
       return res.status(400).json({ error: 'لا يوجد اشتراك نشط' });
@@ -110,7 +147,10 @@ router.post('/cancel-subscription', auth, async (req, res) => {
 // الحصول على حالة الاشتراك
 router.get('/subscription-status', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
     
     if (!user.stripeSubscriptionId) {
       return res.json({
@@ -135,157 +175,70 @@ router.get('/subscription-status', auth, async (req, res) => {
   }
 });
 
-router.post('/create-checkout-session', auth, async (req, res) => {
+// معالج Webhook من Stripe
+router.post('/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'المستخدم غير مصادق' });
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook Error:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        await handleCheckoutSession(session);
+        break;
+      case 'invoice.payment_succeeded':
+        const invoice = event.data.object;
+        await handleSuccessfulPayment(invoice);
+        break;
+      case 'invoice.payment_failed':
+        const failedInvoice = event.data.object;
+        await handleFailedPayment(failedInvoice);
+        break;
     }
 
-    const user = await User.findById(req.user.userId); // استخدام userId بدلاً من _id
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
-      customer_email: user.email,
-      metadata: {
-        userId: user.userId,
-      },
-    });
-
-    res.json({ url: session.url });
+    res.json({ received: true });
   } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
-  }
-});
-// التحقق من حالة الاشتراك
-router.get('/subscription-status/:userId', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-
-    if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-
-    res.json({
-      isActive: user.subscriptionStatus === 'active',
-      endDate: user.subscriptionEndDate,
-    });
-  } catch (error) {
-    console.error('Error fetching subscription status:', error);
-    res.status(500).json({ error: 'فشل في جلب حالة الاشتراك' });
+    console.error('Error processing webhook:', error);
+    res.status(500).json({ error: 'فشل في معالجة webhook' });
   }
 });
 
-router.post('/create-payment-intent', async (req, res) => {
-  const { amount, currency, userId } = req.body;
-
-  try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      metadata: { userId },
-    });
-
-    res.json({ clientSecret: paymentIntent.client_secret });
-  } catch (error) {
-    console.error('Error creating payment intent:', error);
-    res.status(500).json({ error: 'Failed to create payment intent' });
-  }
-});
-
-router.post('/confirm-payment', async (req, res) => {
-  const { paymentIntentId, userId } = req.body;
-
-  try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (paymentIntent.status === 'succeeded') {
-      const user = await User.findById(userId);
-      if (user) {
-        user.subscriptionStatus = 'active';
-        await user.save();
-      }
-      res.json({ success: true, message: 'Payment succeeded' });
-    } else {
-      res.status(400).json({ success: false, message: 'Payment not succeeded' });
-    }
-  } catch (error) {
-    console.error('Error confirming payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
-  }
-});
-
-router.post('/stripe-webhook', async (req, res) => {
-  const event = req.body;
-
-  switch (event.type) {
-    case 'invoice.payment_succeeded':
-      const subscriptionId = event.data.object.subscription;
-      const user = await User.findOne({ stripeSubscriptionId: subscriptionId });
-      if (user) {
-        user.subscriptionStatus = 'active';
-        await user.save();
-      }
-      break;
-    case 'invoice.payment_failed':
-      const failedSubscriptionId = event.data.object.subscription;
-      const failedUser = await User.findOne({ stripeSubscriptionId: failedSubscriptionId });
-      if (failedUser) {
-        failedUser.subscriptionStatus = 'expired';
-        await failedUser.save();
-      }
-      break;
-  }
-
-  res.json({ received: true });
-});
-
-router.post('/create-subscription', async (req, res) => {
-  const { userId, paymentMethodId } = req.body;
-
-  try {
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const customer = await stripe.customers.create({
-      payment_method: paymentMethodId,
-      email: user.email,
-      invoice_settings: {
-        default_payment_method: paymentMethodId,
-      },
-    });
-
-    const subscription = await stripe.subscriptions.create({
-      customer: customer.id,
-      items: [{ price: process.env.STRIPE_PRICE_ID }],
-      expand: ['latest_invoice.payment_intent'],
-    });
-
+// دوال معالجة Webhook
+async function handleCheckoutSession(session) {
+  const user = await User.findOne({ email: session.customer_email });
+  if (user) {
     user.subscriptionStatus = 'active';
-    user.stripeCustomerId = customer.id;
-    user.stripeSubscriptionId = subscription.id;
     await user.save();
-
-    res.json({ subscriptionId: subscription.id, clientSecret: subscription.latest_invoice.payment_intent.client_secret });
-  } catch (error) {
-    console.error('Error creating subscription:', error);
-    res.status(500).json({ error: 'Failed to create subscription' });
   }
-});
+}
 
+async function handleSuccessfulPayment(invoice) {
+  if (invoice.subscription) {
+    const user = await User.findOne({ stripeSubscriptionId: invoice.subscription });
+    if (user) {
+      user.subscriptionStatus = 'active';
+      user.lastPaymentDate = new Date();
+      user.nextPaymentDate = new Date(invoice.next_payment_attempt * 1000);
+      await user.save();
+    }
+  }
+}
+
+async function handleFailedPayment(invoice) {
+  if (invoice.subscription) {
+    const user = await User.findOne({ stripeSubscriptionId: invoice.subscription });
+    if (user) {
+      user.subscriptionStatus = 'expired';
+      await user.save();
+    }
+  }
+}
 
 module.exports = router;

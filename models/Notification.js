@@ -1,10 +1,14 @@
-// notification.model.js
 const mongoose = require('mongoose');
 
 const NotificationSchema = new mongoose.Schema({
   userId: {
     type: String,
     required: true,
+    index: true
+  },
+  therapistId: {
+    type: String,
+    required: false,
     index: true
   },
   bookingId: {
@@ -18,13 +22,33 @@ const NotificationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected'],
+    enum: ['pending', 'accepted', 'rejected', 'unread'],
     default: 'pending'
+  },
+  serviceName: {
+    type: String,
+    required: true
+  },
+  servicePrice: {
+    type: Number,
+    required: true
+  },
+  serviceDescription: {
+    type: String,
+    default: ''
+  },
+  userPhone: { // إضافة حقل رقم الهاتف
+    type: String,
+    required: false
   },
   createdAt: {
     type: Date,
     default: Date.now,
     index: true
+  },
+  readAt: {
+    type: Date,
+    default: null
   }
 });
 

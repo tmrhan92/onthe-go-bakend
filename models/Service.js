@@ -1,22 +1,71 @@
-// models/Service.js
 const mongoose = require('mongoose');
 
 const ServiceSchema = new mongoose.Schema({
-_id: {
-type: String, // تعريف _id كسلسلة
-required: true,
-},
-name: { type: String, required: true },
-description: { type: String, required: true },
-serviceType: { type: String, required: true },
-price: { type: Number, required: true },
-duration: { type: Number, required: true },
-subCategory: { type: String, required: true }, // إضافة حقل الفئة الفرعية
-latitude: { type: Number, required: true },   // إحداثيات خط العرض
-longitude: { type: Number, required: true } ,   // إحداثيات خط الطول
-therapistId: { type: String,  required: true }, // _id للخدمة
-
+  _id: {
+    type: String, // تعريف _id كسلسلة
+    required: true,
+  },
+  name: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+    required: true,
+  },
+  serviceType: {
+    type: String,
+    required: true,
+  },
+  subCategory: {
+    type: String,
+    required: true,
+  },
+  price: {
+    type: Number,
+    required: true,
+  },
+  duration: {
+    type: Number,
+    required: true,
+  },
+  hoursRequired: {
+    type: Number,
+    required: false,
+  },
+  latitude: {
+    type: Number,
+    required: true,
+  },
+  longitude: {
+    type: Number,
+    required: true,
+  },
+  therapistId: {
+    type: String,
+    required: true,
+  },
+   requestedBy: { // إضافة حقل لتتبع من طلب الخدمة
+    type: String,
+    default: null,
+  },
+  province: {
+    type: String,
+    required: true,
+  },
+  area: {
+    type: String,
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ['available', 'ongoing', 'completed'],
+    default: 'available',
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
-
 
 module.exports = mongoose.model('Service', ServiceSchema);

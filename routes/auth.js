@@ -185,17 +185,21 @@ router.get('/:userId/time-balance', auth, async (req, res) => {
 
 // مسار للتحقق من حالة الاشتراك
 router.get('/subscription-status/:userId', auth, async (req, res) => {
-  try {
-    const user = req.user; // تم الحصول على المستخدم من middleware auth
+   try {
+    const user = await User.findOne({ userId: req.params.userId });
+    if (!user) {
+      return res.status(404).json({ message: 'المستخدم غير موجود' });
+    }
+    // إرجاع حالة الاشتراك
     res.json({
-      success: true,
       subscriptionStatus: user.subscriptionStatus,
-      trialEndDate: user.trialEndDate,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionEndDate: user.subscriptionEndDate
     });
   } catch (error) {
-    console.error('Error fetching subscription status:', error);
-    res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
+    res.status(500).json({ message: 'خطأ في الخادم' });
   }
 });
+
 
 module.exports = router;

@@ -26,7 +26,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID,
+          price: process.env.STRIPE_PRICE_ID, // ✅ تأكد من أن STRIPE_PRICE_ID صحيح
           quantity: 1,
         },
       ],

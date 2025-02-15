@@ -190,10 +190,10 @@ router.get('/subscription-status/:userId', auth, async (req, res) => {
   try {
     console.log("🔹 التحقق من اشتراك المستخدم:", req.user.userId);
 
-    // ابحث عن المستخدم باستخدام userId من التوكن
     const user = await User.findOne({ userId: req.user.userId });
 
     if (!user) {
+      console.error('❌ المستخدم غير موجود:', req.user.userId);
       return res.status(404).json({ message: '❌ المستخدم غير موجود' });
     }
 

@@ -119,19 +119,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
     }
 
-    if (user.role === 'مقدم_خدمة' && user.subscriptionStatus === 'trial' && new Date() > user.trialEndDate) {
-      user.subscriptionStatus = 'expired';
-      await user.save();
-      return res.status(403).send("انتهت فترة التجربة المجانية. يرجى الاشتراك للاستمرار.");
-    }
-
+    // إنشاء توكن جديد
     const token = jwt.sign(
       {
-        userId: user.userId,
-        role: user.role,
+        userId: user.userId, // تأكد من أن userId موجود
+        role: user.role,     // تأكد من أن role موجود
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      process.env.JWT_SECRET, // استخدم السر الصحيح
+      { expiresIn: '1h' }     // صلاحية التوكن
     );
 
     res.json({

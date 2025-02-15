@@ -190,6 +190,7 @@ router.get('/subscription-status/:userId', auth, async (req, res) => {
   try {
     console.log("🔹 التحقق من اشتراك المستخدم:", req.user.userId);
 
+    // ابحث عن المستخدم باستخدام userId من التوكن
     const user = await User.findOne({ userId: req.user.userId });
 
     if (!user) {
@@ -199,14 +200,12 @@ router.get('/subscription-status/:userId', auth, async (req, res) => {
     res.json({
       subscriptionStatus: user.subscriptionStatus,
       subscriptionPlan: user.subscriptionPlan,
-      subscriptionEndDate: user.subscriptionEndDate
+      subscriptionEndDate: user.subscriptionEndDate,
     });
   } catch (error) {
     console.error('❌ خطأ في جلب حالة الاشتراك:', error);
-    res.status(500).json({ message: 'فشل في جلب حالة الاشتراك' });
+    res.status(500).json({ message: 'فشل في جلب حالة الاشتراك: ' + error.message });
   }
 });
-
-
 
 module.exports = router;

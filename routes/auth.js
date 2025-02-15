@@ -3,6 +3,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
+const auth = require('./auth'); // استيراد middleware التحقق من التوكن
+
 
 
 // دالة لتوليد userId

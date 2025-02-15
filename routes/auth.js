@@ -184,17 +184,16 @@ router.get('/:userId/time-balance', auth, async (req, res) => {
 });
 
 // مسار للتحقق من حالة الاشتراك
-router.get('/subscription-status/:userId', auth, async (req, res) => {
-   try {
-    const user = await User.findOne({ userId: req.params.userId });
-    if (!user) {
-      return res.status(404).json({ message: 'المستخدم غير موجود' });
+router.get('/:userId/subscription-status', auth, async (req, res) => {
+  try {
+    if (req.user.userId !== req.params.userId) {
+      return res.status(403).json({ message: 'غير مصرح بالوصول' });
     }
-    // إرجاع حالة الاشتراك
+    
     res.json({
-      subscriptionStatus: user.subscriptionStatus,
-      subscriptionPlan: user.subscriptionPlan,
-      subscriptionEndDate: user.subscriptionEndDate
+      subscriptionStatus: req.user.subscriptionStatus,
+      subscriptionPlan: req.user.subscriptionPlan,
+      subscriptionEndDate: req.user.subscriptionEndDate
     });
   } catch (error) {
     res.status(500).json({ message: 'خطأ في الخادم' });

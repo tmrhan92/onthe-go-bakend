@@ -10,22 +10,26 @@ const auth = async (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ error: '🚫 المصادقة مطلوبة' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findOne({ _id: decoded.userId });
+    const user = await User.findOne({ userId: decoded.userId }); // ✅ تعديل البحث
 
     if (!user) {
-      throw new Error();
+      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
     }
 
-    req.user = user; // إضافة بيانات المستخدم إلى الطلب
+    req.user = user; // ✅ التأكد من تعيين المستخدم في الطلب
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Invalid authentication token' });
+    console.error('❌ خطأ في المصادقة:', error);
+    res.status(401).json({ error: '🚫 فشل في المصادقة' });
   }
 };
+
+module.exports = auth;
+
 
 // دالة لتوليد userId
 const generateUserId = (name, role) => {
@@ -184,11 +188,11 @@ router.get('/:userId/time-balance', auth, async (req, res) => {
 });
 
 // مسار للتحقق من حالة الاشتراك
-router.get('/subscription-status/:userId', async (req, res) => {
+router.get('/subscription-status/:userId', auth, async (req, res) => {
   try {
-    console.log("🔹 التحقق من اشتراك المستخدم:", req.params.userId);
+    console.log("🔹 التحقق من اشتراك المستخدم:", req.user.userId);
 
-    const user = await User.findOne({ userId: req.params.userId });
+    const user = await User.findOne({ userId: req.user.userId });
 
     if (!user) {
       return res.status(404).json({ message: '❌ المستخدم غير موجود' });

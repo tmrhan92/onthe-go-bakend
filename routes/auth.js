@@ -152,22 +152,18 @@ router.post('/login', async (req, res) => {
     );
 
     // إرسال استجابة منظمة
-    res.status(200).json({
-      success: true,
-      data: {
-        token,
-        user: {
-          userId: user.userId,
-          role: user.role,
-          name: user.name,
-          timeBalance: user.timeBalance,
-          rating: user.rating,
-          completedServices: user.completedServices,
-          subscriptionStatus: user.subscriptionStatus,
-          trialEndDate: user.trialEndDate
-        }
-      }
-    });
+res.status(200).json({
+  success: true,
+  token: token,
+  userId: user.userId,
+  role: user.role,
+  name: user.name,
+  timeBalance: user.timeBalance,
+  rating: user.rating,
+  completedServices: user.completedServices,
+  subscriptionStatus: user.subscriptionStatus,
+  trialEndDate: user.trialEndDate
+});
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'An error occurred during login' });

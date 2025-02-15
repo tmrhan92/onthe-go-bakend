@@ -242,4 +242,78 @@ async function handleFailedPayment(invoice) {
   }
 }
 
+const handleWebhook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        await handleSuccessfulSubscription(session);
+        break;
+        
+      case 'customer.subscription.updated':
+        const subscription = event.data.object;
+        await handleSubscriptionUpdate(subscription);
+        break;
+        
+      case 'customer.subscription.deleted':
+        const deletedSubscription = event.data.object;
+        await handleSubscriptionCancellation(deletedSubscription);
+        break;
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+};
+
+async function handleSuccessfulSubscription(session) {
+  const userId = session.metadata.userId;
+  const user = await User.findById(userId);
+  
+  if (user) {
+    user.subscriptionStatus = 'active';
+    user.stripeCustomerId = session.customer;
+    user.stripeSubscriptionId = session.subscription;
+    user.subscriptionStartDate = new Date();
+    user.subscriptionEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await user.save();
+  }
+}
+
+async function handleSubscriptionUpdate(subscription) {
+  const user = await User.findOne({ stripeSubscriptionId: subscription.id });
+  
+  if (user) {
+    user.subscriptionStatus = subscription.status === 'active' ? 'active' : 'expired';
+    user.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+    await user.save();
+  }
+}
+
+async function handleSubscriptionCancellation(subscription) {
+  const user = await User.findOne({ stripeSubscriptionId: subscription.id });
+  
+  if (user) {
+    user.subscriptionStatus = 'expired';
+    user.subscriptionEndDate = new Date();
+    await user.save();
+  }
+}
+
+
 module.exports = router;

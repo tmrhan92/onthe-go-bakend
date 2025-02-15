@@ -13,22 +13,25 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ error: '🚫 المصادقة مطلوبة' });
     }
 
+    // تحقق من صحة التوكن
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findOne({ userId: decoded.userId }); // ✅ تعديل البحث
+    console.log("🔹 التوكن المفكوك:", decoded); // تسجيل التوكن المفكوك للتصحيح
+
+    // ابحث عن المستخدم باستخدام userId من التوكن
+    const user = await User.findOne({ userId: decoded.userId });
 
     if (!user) {
       return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
     }
 
-    req.user = user; // ✅ التأكد من تعيين المستخدم في الطلب
+    // تعيين المستخدم في الطلب للاستخدام لاحقًا
+    req.user = user;
     next();
   } catch (error) {
     console.error('❌ خطأ في المصادقة:', error);
-    res.status(401).json({ error: '🚫 فشل في المصادقة' });
+    res.status(401).json({ error: '🚫 فشل في المصادقة: ' + error.message });
   }
-};
-
-module.exports = auth;
+};module.exports = auth;
 
 
 // دالة لتوليد userId

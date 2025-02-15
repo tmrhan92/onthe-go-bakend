@@ -40,13 +40,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     });
 
     res.json({ url: session.url });
-  } catch (error) {
-    console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
-    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
-  }
-});
 
-    res.json({ url: session.url });
   } catch (error) {
     console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
@@ -60,7 +54,7 @@ router.post('/confirm-subscription', auth, async (req, res) => {
     const user = await User.findOne({ userId: req.user.userId });
 
     if (!user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
+      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
     }
 
     console.log("🔹 تأكيد الاشتراك لـ:", user.userId);

@@ -103,46 +103,59 @@ router.post('/register', async (req, res) => {
 
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
-      return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
-    // إنشاء توكن جديد
+    // تحسين إنشاء التوكن
     const token = jwt.sign(
       {
-        userId: user.userId, // تأكد من أن userId موجود
-        role: user.role,     // تأكد من أن role موجود
+        userId: user.userId,
+        role: user.role,
+        email: user.email
       },
-      process.env.JWT_SECRET, // استخدم السر الصحيح
-      { expiresIn: '1h' }     // صلاحية التوكن
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '24h', // زيادة مدة صلاحية التوكن
+        algorithm: 'HS256' // تحديد خوارزمية التشفير
+      }
     );
 
-    res.json({
-      token,
-      role: user.role,
-      userId: user.userId,
-      name: user.name,
-      timeBalance: user.timeBalance,
-      rating: user.rating,
-      completedServices: user.completedServices,
-      subscriptionStatus: user.subscriptionStatus,
-      trialEndDate: user.trialEndDate,
+    // إرسال استجابة منظمة
+    res.status(200).json({
+      success: true,
+      data: {
+        token,
+        user: {
+          userId: user.userId,
+          role: user.role,
+          name: user.name,
+          timeBalance: user.timeBalance,
+          rating: user.rating,
+          completedServices: user.completedServices,
+          subscriptionStatus: user.subscriptionStatus,
+          trialEndDate: user.trialEndDate
+        }
+      }
     });
   } catch (error) {
-    console.error("Error during login:", error);
-    res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'An error occurred during login' });
   }
 });
 

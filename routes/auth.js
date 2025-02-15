@@ -7,31 +7,46 @@ const router = express.Router();
 // Middleware للتحقق من التوكن
 const auth = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-
-    if (!token) {
-      return res.status(401).json({ error: '🚫 المصادقة مطلوبة' });
+    // تحسين طريقة استخراج التوكن
+    const authHeader = req.header('Authorization');
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Authorization header is required' });
     }
 
-    // تحقق من صحة التوكن
+    // التأكد من صيغة التوكن
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+      return res.status(401).json({ error: 'Authorization header must be in format: Bearer <token>' });
+    }
+
+    const token = parts[1];
+    
+    // التحقق من صحة التوكن
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("🔹 التوكن المفكوك:", decoded); // تسجيل التوكن المفكوك للتصحيح
-
-    // ابحث عن المستخدم باستخدام userId من التوكن
+    
+    // البحث عن المستخدم
     const user = await User.findOne({ userId: decoded.userId });
-
     if (!user) {
-      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // تعيين المستخدم في الطلب للاستخدام لاحقًا
+    // تخزين معلومات المستخدم
     req.user = user;
+    req.token = token;
     next();
   } catch (error) {
-    console.error('❌ خطأ في المصادقة:', error);
-    res.status(401).json({ error: '🚫 فشل في المصادقة: ' + error.message });
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    console.error('Auth error:', error);
+    res.status(401).json({ error: 'Please authenticate' });
   }
-};module.exports = auth;
+};
+
+module.exports = auth;
 
 
 // دالة لتوليد userId

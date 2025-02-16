@@ -31,7 +31,6 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
-
 // ✅ تأكيد الاشتراك بعد الدفع
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {

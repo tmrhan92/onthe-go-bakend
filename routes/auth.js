@@ -93,12 +93,16 @@ router.post('/register', async (req, res) => {
     const userId = generateUserId(name, role);
 
     const newUser = new User({
-      userId, // ✅ تأكد من تخزين userId هنا
+      _id: userId,
+      userId,
       email,
       password: hashedPassword,
       name,
       role,
       phone,
+      timeBalance: 0,
+      rating: 0,
+      completedServices: 0,
       subscriptionStatus: 'trial',
       trialEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });

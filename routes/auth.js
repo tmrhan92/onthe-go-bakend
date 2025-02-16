@@ -45,8 +45,6 @@ const auth = async (req, res, next) => {
     res.status(401).json({ error: '🚫 Please authenticate' });
   }
 };
-module.exports = auth;
-
 
 // دالة لتوليد userId
 const generateUserId = (name, role) => {
@@ -110,7 +108,6 @@ router.post('/register', async (req, res) => {
     res.status(500).send("خطأ في التسجيل");
   }
 });
-
 
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
@@ -223,6 +220,7 @@ router.get('/subscription-status/:userId', auth, async (req, res) => {
   }
 });
 
+// إنشاء جلسة دفع في Stripe
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
     console.log("🔹 المستخدم في create-checkout-session:", req.user);
@@ -239,13 +237,28 @@ router.post('/create-checkout-session', auth, async (req, res) => {
 
     console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
 
-    // هنا ضع كود Stripe لإنشاء الجلسة
-    res.json({ success: true, message: "تم إنشاء جلسة الدفع بنجاح" });
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+      customer_email: user.email,
+      metadata: {
+        userId: user.userId,
+      },
+    });
+
+    res.json({ url: session.url });
   } catch (error) {
     console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
-
 
 module.exports = router;

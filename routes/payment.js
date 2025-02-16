@@ -8,6 +8,7 @@ const router = express.Router();
 // ✅ إنشاء جلسة دفع في Stripe
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
+    const user = req.user; // تأكد من الحصول على المستخدم من الطلب
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -31,6 +32,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
+
 // ✅ تأكيد الاشتراك بعد الدفع
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {
@@ -83,8 +85,6 @@ router.post('/confirm-subscription', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في تأكيد الاشتراك' });
   }
 });
-
-
 
 // ✅ Webhook لمعالجة الدفع التلقائي
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {

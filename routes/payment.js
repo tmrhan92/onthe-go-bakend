@@ -1,4 +1,3 @@
-const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const auth = require('./auth'); 
 const User = require('../models/User');
@@ -8,11 +7,28 @@ const router = express.Router();
 // ✅ إنشاء جلسة دفع في Stripe
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
+    console.log("🔹 المستخدم في create-checkout-session:", req.user);
+
+    if (!req.user) {
+      console.error("🚨 req.user is undefined!");
+      return res.status(401).json({ error: '🚫 فشل في المصادقة، المستخدم غير موجود' });
+    }
+
+    const user = await User.findOne({ userId: req.user.userId });
+
+    if (!user) {
+      console.error("🚨 User not found in database:", req.user.userId);
+      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
+    }
+
+    console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
+
+    // ✅ إنشاء الجلسة مع Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID,
+          price: process.env.STRIPE_PRICE_ID, // ✅ تأكد من أن STRIPE_PRICE_ID صحيح
           quantity: 1,
         },
       ],
@@ -26,11 +42,13 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     });
 
     res.json({ url: session.url });
+
   } catch (error) {
     console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
+
 // ✅ تأكيد الاشتراك بعد الدفع
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {
@@ -143,35 +161,4 @@ async function handleFailedPayment(invoice) {
   }
 }
 
-module.exports = router;  Future<String> createCheckoutSession(String userId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-
-      if (token == null) {
-        throw Exception('❌ لم يتم العثور على التوكن، تأكد من تسجيل الدخول.');
-      }
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/payment/create-checkout-session'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'userId': userId}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['url'] == null) {
-          throw Exception('❌ لم يتم استلام رابط الدفع من الخادم');
-        }
-        return data['url'];
-      } else {
-        throw Exception('❌ فشل إنشاء جلسة الدفع: ${response.body}');
-      }
-    } catch (e) {
-      print('❌ خطأ في createCheckoutSession: $e');
-      throw Exception('❌ خطأ في إنشاء جلسة الدفع');
-    }
-  }
+module.exports = router;

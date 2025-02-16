@@ -20,30 +20,39 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
     }
 
-    // هنا المشكلة - لم يتم إنشاء جلسة Stripe بشكل صحيح
+    console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
+
+    // ✅ إنشاء عميل في Stripe إذا لم يكن موجودًا
+    const customer = await stripe.customers.create({
+      email: user.email,
+      name: user.name,
+      metadata: { userId: user.userId }
+    });
+
+    // ✅ إنشاء جلسة الدفع في Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
+      mode: 'subscription',
+      customer: customer.id, // ✅ ربط العميل بجلسة الدفع
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID,
+          price: process.env.STRIPE_PRICE_ID, // ✅ تأكد من صحة `price_1QsLJDJSlIAxPsC687tP2kpd`
           quantity: 1,
         },
       ],
-      mode: 'subscription',
       success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL}/cancel`,
-      customer_email: user.email,
-      metadata: {
-        userId: user.userId,
-      },
     });
 
-    res.json({ url: session.url });
+    console.log("✅ جلسة الدفع تم إنشاؤها بنجاح:", session.url);
+
+    res.json({ success: true, url: session.url });
   } catch (error) {
     console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
-    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
+    res.status(500).json({ error: '❌ فشل في إنشاء جلسة الدفع' });
   }
 });
+
 // ✅ تأكيد الاشتراك بعد الدفع
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {

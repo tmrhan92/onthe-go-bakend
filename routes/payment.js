@@ -6,6 +6,7 @@ const User = require('../models/User');
 const router = express.Router();
 
 // ✅ إنشاء جلسة دفع في Stripe
+// ✅ إنشاء جلسة دفع في Stripe
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
     console.log("🔹 المستخدم في create-checkout-session:", req.user);
@@ -55,7 +56,8 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     console.log("✅ جلسة الدفع تم إنشاؤها بنجاح:", session.url);
 
     if (!session.url) {
-      throw new Error("❌ لم يتم استلام رابط الدفع من Stripe");
+      console.error("❌ لم يتم استلام رابط الدفع من Stripe!");
+      return res.status(500).json({ error: "❌ لم يتم استلام رابط الدفع من Stripe" });
     }
 
     res.json({ success: true, url: session.url });
@@ -64,6 +66,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: '❌ فشل في إنشاء جلسة الدفع' });
   }
 });
+
 
 // ✅ تأكيد الاشتراك بعد الدفع
 router.post('/confirm-subscription', auth, async (req, res) => {

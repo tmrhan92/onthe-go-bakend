@@ -54,7 +54,11 @@ router.post('/create-checkout-session', auth, async (req, res) => {
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {
     const { subscriptionId } = req.body;
-    console.log("📢 Received subscriptionId:", subscriptionId); // ✅ تأكد من أن `subscriptionId` ليس فارغًا
+
+    console.log("📢 Received subscriptionId:", subscriptionId); // ✅ تحقق من أن `subscriptionId` ليس فارغًا
+    if (!subscriptionId) {
+      return res.status(400).json({ error: '🚨 Subscription ID is required' });
+    }
 
     const user = await User.findOne({ userId: req.user.userId });
 
@@ -65,7 +69,9 @@ router.post('/confirm-subscription', auth, async (req, res) => {
 
     console.log("🔹 تأكيد الاشتراك لـ:", user.userId);
 
+    // ✅ جلب معلومات الاشتراك من Stripe
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    console.log("📢 Retrieved Subscription:", subscription);
 
     if (subscription.status === 'active') {
       user.subscriptionStatus = 'active';
@@ -85,9 +91,10 @@ router.post('/confirm-subscription', auth, async (req, res) => {
         }
       });
     } else {
+      console.error("❌ Subscription is not active:", subscription.status);
       res.status(400).json({
         success: false,
-        message: '❌ فشل في تفعيل الاشتراك'
+        message: `❌ فشل في تفعيل الاشتراك، الحالة الحالية: ${subscription.status}`
       });
     }
   } catch (error) {

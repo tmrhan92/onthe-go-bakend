@@ -29,6 +29,8 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       metadata: { userId: user.userId }
     });
 
+    console.log("🔹 تم إنشاء عميل Stripe:", customer.id);
+
     // ✅ إنشاء جلسة الدفع في Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],

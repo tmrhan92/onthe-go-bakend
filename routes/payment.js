@@ -21,26 +21,7 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     }
 
     console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID, // ✅ تأكد من أن STRIPE_PRICE_ID صحيح
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
-      customer_email: user.email,
-      metadata: {
-        userId: user.userId,
-      },
-    });
-
-    res.json({ url: session.url });
-
+    // بقية كود إنشاء الجلسة...
   } catch (error) {
     console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });

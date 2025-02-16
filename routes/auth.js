@@ -246,3 +246,6 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
+
+
+module.exports = router;

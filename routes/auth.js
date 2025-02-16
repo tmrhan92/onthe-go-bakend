@@ -8,7 +8,7 @@ const router = express.Router();
 const auth = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
-    console.log("📢 Received Authorization Header:", authHeader); // ✅ طباعة الهيدر المستلم
+    console.log("📢 Received Authorization Header:", authHeader);
 
     if (!authHeader) {
       return res.status(401).json({ error: '🚫 Authorization header is required' });
@@ -20,26 +20,31 @@ const auth = async (req, res, next) => {
     }
 
     const token = parts[1];
-    console.log("📢 Received Token:", token); // ✅ طباعة التوكن بعد استخراجه
+    console.log("📢 Received Token:", token);
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("📢 Decoded Token:", decoded); // ✅ طباعة بيانات المستخدم بعد فك التشفير
+    console.log("📢 Decoded Token:", decoded);
+
+    if (!decoded.userId) {
+      return res.status(401).json({ error: '🚫 User ID not found in token' });
+    }
 
     const user = await User.findOne({ userId: decoded.userId });
 
     if (!user) {
+      console.error("🚫 User not found in database:", decoded.userId);
       return res.status(404).json({ error: '🚫 User not found' });
     }
 
     req.user = user;
     req.token = token;
+    console.log("✅ Authenticated User:", req.user.userId);
     next();
   } catch (error) {
-    console.error('Auth error:', error);
+    console.error('❌ Auth error:', error);
     res.status(401).json({ error: '🚫 Please authenticate' });
   }
 };
-
 module.exports = auth;
 
 
@@ -88,21 +93,17 @@ router.post('/register', async (req, res) => {
     const userId = generateUserId(name, role);
 
     const newUser = new User({
-      _id: userId,
-      userId,
+      userId, // ✅ تأكد من تخزين userId هنا
       email,
       password: hashedPassword,
       name,
       role,
       phone,
-      timeBalance: 0,
-      rating: 0,
-      completedServices: 0,
       subscriptionStatus: 'trial',
       trialEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    const savedUser = await newUser.save();
+    await newUser.save();
     res.status(201).send("تم التسجيل بنجاح");
   } catch (error) {
     console.error("Error during registration:", error);
@@ -110,11 +111,12 @@ router.post('/register', async (req, res) => {
   }
 });
 
+
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -131,7 +133,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
-    // تحسين إنشاء التوكن
     const token = jwt.sign(
       {
         userId: user.userId,
@@ -140,24 +141,20 @@ router.post('/login', async (req, res) => {
       },
       process.env.JWT_SECRET,
       {
-        expiresIn: '24h', // زيادة مدة صلاحية التوكن
-        algorithm: 'HS256' // تحديد خوارزمية التشفير
+        expiresIn: '24h',
+        algorithm: 'HS256'
       }
     );
 
-    // إرسال استجابة منظمة
-res.status(200).json({
-  success: true,
-  token: token,
-  userId: user.userId,
-  role: user.role,
-  name: user.name,
-  timeBalance: user.timeBalance,
-  rating: user.rating,
-  completedServices: user.completedServices,
-  subscriptionStatus: user.subscriptionStatus,
-  trialEndDate: user.trialEndDate
-});
+    res.status(200).json({
+      success: true,
+      token: token,
+      userId: user.userId,
+      role: user.role,
+      name: user.name,
+      subscriptionStatus: user.subscriptionStatus,
+      trialEndDate: user.trialEndDate
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'An error occurred during login' });
@@ -225,5 +222,30 @@ router.get('/subscription-status/:userId', auth, async (req, res) => {
     res.status(500).json({ message: 'فشل في جلب حالة الاشتراك: ' + error.message });
   }
 });
+
+router.post('/create-checkout-session', auth, async (req, res) => {
+  try {
+    console.log("🔹 المستخدم في create-checkout-session:", req.user);
+
+    if (!req.user) {
+      return res.status(401).json({ error: '🚫 فشل في المصادقة، المستخدم غير موجود' });
+    }
+
+    const user = await User.findOne({ userId: req.user.userId });
+
+    if (!user) {
+      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
+    }
+
+    console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
+
+    // هنا ضع كود Stripe لإنشاء الجلسة
+    res.json({ success: true, message: "تم إنشاء جلسة الدفع بنجاح" });
+  } catch (error) {
+    console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
+    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
+  }
+});
+
 
 module.exports = router;

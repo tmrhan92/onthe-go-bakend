@@ -246,3 +246,4 @@ router.post('/create-checkout-session', auth, async (req, res) => {
   }
 });
 
+module.exports = router;

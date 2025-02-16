@@ -8,7 +8,6 @@ const router = express.Router();
 // ✅ إنشاء جلسة دفع في Stripe
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
-    const user = req.user; // تأكد من الحصول على المستخدم من الطلب
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -32,7 +31,6 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
-
 // ✅ تأكيد الاشتراك بعد الدفع
 router.post('/confirm-subscription', auth, async (req, res) => {
   try {
@@ -85,6 +83,8 @@ router.post('/confirm-subscription', auth, async (req, res) => {
     res.status(500).json({ error: 'فشل في تأكيد الاشتراك' });
   }
 });
+
+
 
 // ✅ Webhook لمعالجة الدفع التلقائي
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -143,4 +143,35 @@ async function handleFailedPayment(invoice) {
   }
 }
 
-module.exports = router;
+module.exports = router;  Future<String> createCheckoutSession(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        throw Exception('❌ لم يتم العثور على التوكن، تأكد من تسجيل الدخول.');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/payment/create-checkout-session'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'userId': userId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['url'] == null) {
+          throw Exception('❌ لم يتم استلام رابط الدفع من الخادم');
+        }
+        return data['url'];
+      } else {
+        throw Exception('❌ فشل إنشاء جلسة الدفع: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ خطأ في createCheckoutSession: $e');
+      throw Exception('❌ خطأ في إنشاء جلسة الدفع');
+    }
+  }

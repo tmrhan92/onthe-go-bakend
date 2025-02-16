@@ -7,42 +7,36 @@ const router = express.Router();
 // Middleware للتحقق من التوكن
 const auth = async (req, res, next) => {
   try {
-    // تحسين طريقة استخراج التوكن
     const authHeader = req.header('Authorization');
+    console.log("📢 Received Authorization Header:", authHeader); // ✅ طباعة الهيدر المستلم
+
     if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header is required' });
+      return res.status(401).json({ error: '🚫 Authorization header is required' });
     }
 
-    // التأكد من صيغة التوكن
     const parts = authHeader.split(' ');
     if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      return res.status(401).json({ error: 'Authorization header must be in format: Bearer <token>' });
+      return res.status(401).json({ error: '🚫 Authorization header must be in format: Bearer <token>' });
     }
 
     const token = parts[1];
-    
-    // التحقق من صحة التوكن
+    console.log("📢 Received Token:", token); // ✅ طباعة التوكن بعد استخراجه
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // البحث عن المستخدم
+    console.log("📢 Decoded Token:", decoded); // ✅ طباعة بيانات المستخدم بعد فك التشفير
+
     const user = await User.findOne({ userId: decoded.userId });
+
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: '🚫 User not found' });
     }
 
-    // تخزين معلومات المستخدم
     req.user = user;
     req.token = token;
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
-    }
     console.error('Auth error:', error);
-    res.status(401).json({ error: 'Please authenticate' });
+    res.status(401).json({ error: '🚫 Please authenticate' });
   }
 };
 

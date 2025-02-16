@@ -8,28 +8,11 @@ const router = express.Router();
 // ✅ إنشاء جلسة دفع في Stripe
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
-    console.log("🔹 المستخدم في create-checkout-session:", req.user);
-
-    if (!req.user) {
-      console.error("🚨 req.user is undefined!");
-      return res.status(401).json({ error: '🚫 فشل في المصادقة، المستخدم غير موجود' });
-    }
-
-    const user = await User.findOne({ userId: req.user.userId });
-
-    if (!user) {
-      console.error("🚨 User not found in database:", req.user.userId);
-      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
-    }
-
-    console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
-
-    // ✅ إنشاء الجلسة مع Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID, // ✅ تأكد من أن STRIPE_PRICE_ID صحيح
+          price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
@@ -43,7 +26,6 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     });
 
     res.json({ url: session.url });
-
   } catch (error) {
     console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
     res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });

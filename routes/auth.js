@@ -167,19 +167,52 @@ router.post('/login', async (req, res) => {
 });
 
 // تحديث الرصيد الزمني
-router.post('/update-time-balance', auth, async (req, res) => {
+// مسار للحصول على الرصيد الزمني للمستخدم
+router.get('/:userId/time-balance', auth, async (req, res) => {
   try {
-    const { timeBalance } = req.body;
     const user = req.user; // تم الحصول على المستخدم من middleware auth
 
-    user.timeBalance = timeBalance;
-    await user.save();
+    // التحقق من أن المستخدم موجود
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+    }
+
+    // التحقق من وجود timeBalance
+    if (user.timeBalance === undefined) {
+      return res.status(400).json({ success: false, error: 'الرصيد الزمني غير معرّف' });
+    }
+
+    // إرجاع الرصيد الزمني
     res.json({ success: true, timeBalance: user.timeBalance });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('❌ Error fetching user time balance:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
   }
 });
 
+// مسار لتحديث الرصيد الزمني
+router.post('/update-time-balance', auth, async (req, res) => {
+  try {
+    const { timeBalance } = req.body;
+
+    // التحقق من وجود timeBalance في الطلب
+    if (timeBalance === undefined || timeBalance === null) {
+      return res.status(400).json({ success: false, error: 'الرصيد الزمني مطلوب' });
+    }
+
+    const user = req.user; // تم الحصول على المستخدم من middleware auth
+
+    // تحديث الرصيد الزمني
+    user.timeBalance = timeBalance;
+    await user.save();
+
+    // إرجاع الاستجابة الناجحة
+    res.json({ success: true, timeBalance: user.timeBalance });
+  } catch (error) {
+    console.error('❌ Error updating time balance:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
+  }
+});
 // تحديث تقييم المستخدم
 router.post('/update-rating', auth, async (req, res) => {
   try {

@@ -87,6 +87,31 @@ const UserSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  stripeCustomerId: {
+    type: String,
+    sparse: true,
+  },
+  stripeSubscriptionId: {
+    type: String,
+    sparse: true,
+  },
+  subscriptionPlan: {
+    type: String,
+    enum: ['free', 'basic', 'premium'],
+    default: 'free',
+  },
+  subscriptionStartDate: {
+    type: Date,
+  },
+  subscriptionEndDate: {
+    type: Date,
+  },
+  lastPaymentDate: {
+    type: Date,
+  },
+  nextPaymentDate: {
+    type: Date,
   }
 }, {
   // Enable virtuals
@@ -109,6 +134,11 @@ UserSchema.pre('save', function(next) {
   this.timeBalance = this.earnedHours - this.spentHours;
   next();
 });
+
+// إضافة الفهارس الجديدة
+UserSchema.index({ stripeCustomerId: 1 });
+UserSchema.index({ stripeSubscriptionId: 1 });
+UserSchema.index({ subscriptionStatus: 1 });
 
 // Index creation for frequently queried fields
 UserSchema.index({ email: 1 });

@@ -4,46 +4,86 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const router = express.Router();
 
+// Middleware للتحقق من التوكن
+const auth = async (req, res, next) => {
+  try {
+    const authHeader = req.header('Authorization');
+    console.log("📢 Received Authorization Header:", authHeader);
+
+    if (!authHeader) {
+      return res.status(401).json({ error: '🚫 Authorization header is required' });
+    }
+
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+      return res.status(401).json({ error: '🚫 Authorization header must be in format: Bearer <token>' });
+    }
+
+    const token = parts[1];
+    console.log("📢 Received Token:", token);
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("📢 Decoded Token:", decoded);
+
+    if (!decoded.userId) {
+      return res.status(401).json({ error: '🚫 User ID not found in token' });
+    }
+
+    const user = await User.findOne({ userId: decoded.userId });
+
+    if (!user) {
+      console.error("🚫 User not found in database:", decoded.userId);
+      return res.status(404).json({ error: '🚫 User not found' });
+    }
+
+    req.user = user;
+    req.token = token;
+    console.log("✅ Authenticated User:", req.user.userId);
+    next();
+  } catch (error) {
+    console.error('❌ Auth error:', error);
+    res.status(401).json({ error: '🚫 Please authenticate' });
+  }
+};
+module.exports = auth;
+
+
 // دالة لتوليد userId
 const generateUserId = (name, role) => {
-  const timestamp = Date.now(); // إضافة الطابع الزمني
+  const timestamp = Date.now();
   return `${name.toLowerCase().replace(/\s+/g, '_')}_${role.toLowerCase()}_${timestamp}`;
 };
 
 // Middleware للتحقق من Content-Type
 const checkContentType = (req, res, next) => {
-    console.log('Content-Type:', req.headers['content-type']);
-    if (req.headers['content-type'] !== 'application/json') {
-        return res.status(400).send('Content-Type must be application/json');
-    }
-    next();
+  if (req.headers['content-type'] !== 'application/json') {
+    return res.status(400).send('Content-Type must be application/json');
+  }
+  next();
 };
 
 // تحديث FCM Token
-router.post('/update-fcm-token', async (req, res) => {
-    try {
-        const { userId, fcmToken } = req.body;
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
-        }
-        await User.findByIdAndUpdate(userId, { fcmToken });
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
+router.post('/update-fcm-token', auth, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    const user = req.user; // تم الحصول على المستخدم من middleware auth
+
+    await User.findByIdAndUpdate(user._id, { fcmToken });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // تسجيل المستخدم
 router.post('/register', async (req, res) => {
-  const { email, password, name, role, phone } = req.body; // إضافة phone
+  const { email, password, name, role, phone } = req.body;
 
-  if (!email || !password || !name || !role || !phone) { // التحقق من وجود phone
+  if (!email || !password || !name || !role || !phone) {
     return res.status(400).send("جميع الحقول مطلوبة، بما في ذلك رقم الهاتف.");
   }
 
   try {
-    // التحقق من وجود المستخدم
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).send("البريد الإلكتروني مستخدم بالفعل.");
@@ -59,15 +99,15 @@ router.post('/register', async (req, res) => {
       password: hashedPassword,
       name,
       role,
-      phone, // إضافة phone
-      timeBalance: 0, // إضافة الرصيد الزمني الافتراضي
-      rating: 0, // إضافة التقييم الافتراضي
-      completedServices: 0, // إضافة عدد الخدمات المكتملة الافتراضي
-      subscriptionStatus: 'trial', // حالة الاشتراك الافتراضية
-      trialEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 يومًا من الآن
+      phone,
+      timeBalance: 0,
+      rating: 0,
+      completedServices: 0,
+      subscriptionStatus: 'trial',
+      trialEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    const savedUser = await newUser.save();
+    await newUser.save();
     res.status(201).send("تم التسجيل بنجاح");
   } catch (error) {
     console.error("Error during registration:", error);
@@ -75,65 +115,63 @@ router.post('/register', async (req, res) => {
   }
 });
 
+
+
 // تسجيل الدخول
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
-      return res.status(401).send("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-    }
-
-    // التحقق من حالة الاشتراك
-    if (user.role === 'مقدم_خدمة' && user.subscriptionStatus === 'trial' && new Date() > user.trialEndDate) {
-      user.subscriptionStatus = 'expired';
-      await user.save();
-      return res.status(403).send("انتهت فترة التجربة المجانية. يرجى الاشتراك للاستمرار.");
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
     const token = jwt.sign(
       {
         userId: user.userId,
         role: user.role,
+        email: user.email
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      {
+        expiresIn: '24h',
+        algorithm: 'HS256'
+      }
     );
 
-    res.json({
-      token,
-      role: user.role,
+    res.status(200).json({
+      success: true,
+      token: token,
       userId: user.userId,
+      role: user.role,
       name: user.name,
-      timeBalance: user.timeBalance,
-      rating: user.rating,
-      completedServices: user.completedServices,
       subscriptionStatus: user.subscriptionStatus,
-      trialEndDate: user.trialEndDate,
+      trialEndDate: user.trialEndDate
     });
   } catch (error) {
-    console.error("Error during login:", error);
-    res.status(500).send("حدث خطأ أثناء محاولة تسجيل الدخول.");
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'An error occurred during login' });
   }
 });
 
 // تحديث الرصيد الزمني
-router.post('/update-time-balance', async (req, res) => {
+router.post('/update-time-balance', auth, async (req, res) => {
   try {
-    const { userId, timeBalance } = req.body;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
-    }
+    const { timeBalance } = req.body;
+    const user = req.user; // تم الحصول على المستخدم من middleware auth
+
     user.timeBalance = timeBalance;
     await user.save();
     res.json({ success: true, timeBalance: user.timeBalance });
@@ -143,13 +181,11 @@ router.post('/update-time-balance', async (req, res) => {
 });
 
 // تحديث تقييم المستخدم
-router.post('/update-rating', async (req, res) => {
+router.post('/update-rating', auth, async (req, res) => {
   try {
-    const { userId, rating } = req.body;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
-    }
+    const { rating } = req.body;
+    const user = req.user; // تم الحصول على المستخدم من middleware auth
+
     user.rating = rating;
     await user.save();
     res.json({ success: true, rating: user.rating });
@@ -159,44 +195,60 @@ router.post('/update-rating', async (req, res) => {
 });
 
 // مسار للحصول على الرصيد الزمني للمستخدم
-router.get('/:userId/time-balance', async (req, res) => {
-    try {
-        const userId = req.params.userId;
-
-        // البحث عن المستخدم
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
-        }
-
-        // إرجاع الرصيد الزمني
-        res.json({ success: true, timeBalance: user.timeBalance });
-    } catch (error) {
-        console.error('Error fetching user time balance:', error);
-        res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
-    }
+router.get('/:userId/time-balance', auth, async (req, res) => {
+  try {
+    const user = req.user; // تم الحصول على المستخدم من middleware auth
+    res.json({ success: true, timeBalance: user.timeBalance });
+  } catch (error) {
+    console.error('Error fetching user time balance:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
+  }
 });
 
 // مسار للتحقق من حالة الاشتراك
-router.get('/subscription-status/:userId', async (req, res) => {
+router.get('/subscription-status/:userId', auth, async (req, res) => {
   try {
-    const userId = req.params.userId;
+    console.log("🔹 التحقق من اشتراك المستخدم:", req.user.userId);
 
-    // البحث عن المستخدم
-    const user = await User.findById(userId);
+    const user = await User.findOne({ userId: req.user.userId });
+
     if (!user) {
-      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+      console.error('❌ المستخدم غير موجود:', req.user.userId);
+      return res.status(404).json({ message: '❌ المستخدم غير موجود' });
     }
 
-    // إرجاع حالة الاشتراك
     res.json({
-      success: true,
       subscriptionStatus: user.subscriptionStatus,
-      trialEndDate: user.trialEndDate,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionEndDate: user.subscriptionEndDate,
     });
   } catch (error) {
-    console.error('Error fetching subscription status:', error);
-    res.status(500).json({ success: false, error: 'حدث خطأ في النظام' });
+    console.error('❌ خطأ في جلب حالة الاشتراك:', error);
+    res.status(500).json({ message: 'فشل في جلب حالة الاشتراك: ' + error.message });
+  }
+});
+
+router.post('/create-checkout-session', auth, async (req, res) => {
+  try {
+    console.log("🔹 المستخدم في create-checkout-session:", req.user);
+
+    if (!req.user) {
+      return res.status(401).json({ error: '🚫 فشل في المصادقة، المستخدم غير موجود' });
+    }
+
+    const user = await User.findOne({ userId: req.user.userId });
+
+    if (!user) {
+      return res.status(404).json({ error: '🚫 المستخدم غير موجود' });
+    }
+
+    console.log("🔹 إنشاء جلسة دفع لمستخدم:", user.userId);
+
+    // هنا ضع كود Stripe لإنشاء الجلسة
+    res.json({ success: true, message: "تم إنشاء جلسة الدفع بنجاح" });
+  } catch (error) {
+    console.error('❌ خطأ في إنشاء جلسة الدفع:', error);
+    res.status(500).json({ error: 'فشل في إنشاء جلسة الدفع' });
   }
 });
 

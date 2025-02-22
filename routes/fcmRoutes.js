@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Therapist = require('../models/Therapist');
-const User = require('../models/User');
+const User = require('../models/User'); // Make sure to import User model
 
 // Main route for saving FCM token
 router.post('/fcm/token', async (req, res) => {

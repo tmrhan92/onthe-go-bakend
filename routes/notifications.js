@@ -250,53 +250,53 @@ res.status(500).json({ error: 'حدث خطأ في النظام', details: error.
 
 // جلب الإشعارات لمقدم الخدمة
 router.get('/therapist/:therapistId', async (req, res) => {
-  try {
-    const therapistId = req.params.therapistId;
-    console.log('Fetching notifications for therapistId:', therapistId);
+try {
+const therapistId = req.params.therapistId;
+console.log('Fetching notifications for therapistId:', therapistId);
 
-    const therapist = await Therapist.findById(therapistId);
-    if (!therapist) {
-      return res.status(404).json({ error: 'مقدم الخدمة غير موجود' });
-    }
+const therapist = await Therapist.findById(therapistId);
+if (!therapist) {
+return res.status(404).json({ error: 'مقدم الخدمة غير موجود' });
+}
 
-    const bookings = await Booking.find({ therapistId })
-      .populate('serviceId userId');
+const bookings = await Booking.find({ therapistId })
+    .populate('serviceId userId');
 
-    const notifications = await Notification.find({
-      bookingId: { $in: bookings.map(booking => booking._id) }
-    })
-      .sort({ createdAt: -1 })
-      .populate({
-        path: 'bookingId',
-        populate: [
-          { path: 'serviceId', model: 'Service' },
-          { path: 'userId', model: 'User', select: 'name email phone fcmToken' }
-        ]
-      });
+const notifications = await Notification.find({
+bookingId: { $in: bookings.map(booking => booking._id) }
+})
+    .sort({ createdAt: -1 })
+    .populate({
+path: 'bookingId',
+populate: [
+{ path: 'serviceId', model: 'Service' },
+{ path: 'userId', model: 'User', select: 'name email phone fcmToken' }
+]
+});
 
-    console.log('تم العثور على إشعارات مقدم الخدمة:', notifications.length);
+console.log('تم العثور على إشعارات مقدم الخدمة:', notifications.length);
 
-    const formattedNotifications = notifications.map(notification => ({
-      id: notification._id,
-      message: notification.message,
-      status: notification.status,
-      createdAt: notification.createdAt,
-      bookingDetails: {
-        id: notification.bookingId._id,
-        date: notification.bookingId.date,
-        time: notification.bookingId.time,
-        status: notification.bookingId.status,
-        user: notification.bookingId.userId,
-        service: notification.bookingId.serviceId
-      },
-      userPhone: notification.userPhone || notification.bookingId?.userId?.phone
-    }));
+const formattedNotifications = notifications.map(notification => ({
+id: notification._id,
+message: notification.message,
+status: notification.status,
+createdAt: notification.createdAt,
+bookingDetails: {
+id: notification.bookingId._id,
+date: notification.bookingId.date,
+time: notification.bookingId.time,
+status: notification.bookingId.status,
+user: notification.bookingId.userId,
+service: notification.bookingId.serviceId
+},
+userPhone: notification.userPhone || notification.bookingId?.userId?.phone
+}));
 
-    res.status(200).json(formattedNotifications);
-  } catch (error) {
-    console.error('Error fetching therapist notifications:', error);
-    res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
-  }
+res.status(200).json(formattedNotifications);
+} catch (error) {
+console.error('Error fetching therapist notifications:', error);
+res.status(500).json({ error: 'حدث خطأ في النظام', details: error.message });
+}
 });
 
 // جلب الإشعارات للخدمة
